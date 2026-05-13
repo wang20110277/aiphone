@@ -88,7 +88,12 @@ aiphone/
 │   ├── call_state.py         # 通话状态管理
 │   ├── event_handlers.py     # 事件分发与处理
 │   ├── graph_flow.py         # LangGraph 状态图
-│   ├── llm_qwen.py           # Qwen LLM 调用
+│   ├── llm_base.py           # 抽象 LLM Engine 接口
+│   ├── llm_engines/          # LLM 引擎实现（可插拔）
+│   │   ├── qwen/             # Qwen3.5-9B（默认）
+│   │   │   ├── __init__.py
+│   │   │   └── engine.py
+│   │   └── ...               # 未来可扩展（DeepSeek、GPT 等）
 │   ├── mcp_client.py         # MCP Client（身份核验）
 │   ├── config.py             # 统一配置
 │   ├── prompts/              # Prompt 模板
@@ -346,20 +351,46 @@ Phase 4 接入 Qwen 后替换此规则。
 
 ---
 
-## 6. Phase 4: LLM 集成
+## 6. Phase 4: LLM 集成（可插拔引擎）
 
 ### 目标
 
-接入 Qwen3.5-9B，实现结构化对话决策。
+接入 LLM 实现结构化对话决策，**引擎可插拔切换**。Qwen3.5-9B 作为默认实现，后续可扩展 DeepSeek、GPT 等其他模型。
+
+### 可插拔引擎设计
+
+```python
+# llm_base.py - LLM 抽象接口
+class LLMEngine(ABC):
+    @abstractmethod
+    async def invoke(self, prompt: str, schema: dict) -> LLMAction:
+        """调用 LLM，返回结构化动作"""
+
+    @abstractmethod
+    async def health_check(self) -> bool: ...
+```
+
+```yaml
+# config.yaml - 引擎选择
+engine:
+  llm: qwen               # 可切换为 deepseek / gpt / ...
+```
+
+```python
+# 加载引擎
+engine = load_llm_engine(config.engine.llm)  # 反射加载 llm_engines/{name}/engine.py
+```
+
+**扩展新 LLM 只需：**
+1. 在 `llm_engines/` 下新建目录，实现 `LLMEngine` 接口
+2. 修改 `config.yaml` 中的引擎名称
+3. 无需改动 LangGraph 流程和其他模块
 
 ### 核心模块
 
-**llm_qwen.py** — Qwen 调用封装：
+**llm_base.py** — 抽象接口 + LLMAction 数据结构：
 
 ```python
-def invoke(biz_type, user_input, memory_block, turn_history) -> LLMAction:
-    """调用 Qwen，返回结构化动作"""
-
 @dataclass
 class LLMAction:
     type: str           # "say" | "ask" | "handoff" | "end"
@@ -386,7 +417,9 @@ class LLMAction:
 
 长度控制：Memory Block < 500 token，对话历史最近 10 轮，总输入 < 2000 token。
 
-### 容错机制
+### Qwen3.5-9B 引擎实现关键设计
+
+- GPU2（CUDA_VISIBLE_DEVICES=2）独立部署
 
 - JSON parse 失败 → 正则提取 → 兜底固定话术
 - 超时 3 秒 → 降级固定话术 + 告警
@@ -658,7 +691,7 @@ def compliance_check(action: LLMAction, state: CallState) -> LLMAction:
 | 1 | deploy/ 安装脚本 + DDL | FS/UniMRCP/PG/Redis/MinIO 全部就绪 |
 | 2 | mrcp-asr/ + mrcp-tts/ 可插拔适配层 | MRCPv2 → 引擎 ASR/TTS 端到端通，引擎可配置切换 |
 | 3 | agent-orchestrator/ 核心代码 | ESL 事件循环 + detect_speech 对话循环正常 |
-| 4 | llm_qwen.py + prompts/ | Qwen 结构化输出，三个 biz_type 风格差异明显 |
+| 4 | llm_base.py + llm_engines/ + prompts/ | LLM 结构化输出（默认 Qwen），引擎可配置切换 |
 | 5 | graph_flow.py | LangGraph 多节点流转，合规门禁正常 |
 | 6 | memory/ 模块 | 三层记忆读写 + Memory Block 组装 < 100ms |
 | 7 | mcp_client.py + compliance.py | MCP 身份核验 + 合规拦截正常 |
