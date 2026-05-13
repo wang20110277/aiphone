@@ -73,7 +73,10 @@ CREATE TABLE IF NOT EXISTS callbot.call_session (
   identity_verified  BOOLEAN NOT NULL DEFAULT FALSE,  -- 身份核验是否通过
   verify_attempts    INT NOT NULL DEFAULT 0,  -- 核验尝试次数
   recording_notice_played BOOLEAN NOT NULL DEFAULT FALSE,  -- 录音告知是否已播放（合规关键）
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 记录创建时间
+  create_time       TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  create_user       TEXT NOT NULL DEFAULT 'system',       -- 创建人（系统自动 / 运维人员）
+  update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user       TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
   PRIMARY KEY (call_id, user_id)
 ) PARTITION BY HASH (user_id);
 
@@ -118,6 +121,10 @@ CREATE TABLE IF NOT EXISTS callbot.call_turn (
   start_ms       INT,                          -- 轮次开始毫秒偏移（相对通话开始）
   end_ms         INT,                          -- 轮次结束毫秒偏移
   ts             TIMESTAMPTZ NOT NULL,         -- 时间戳
+  create_time    TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  create_user    TEXT NOT NULL DEFAULT 'system',       -- 创建人
+  update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user    TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
   PRIMARY KEY (turn_id, user_id)
 ) PARTITION BY HASH (user_id);
 
@@ -156,6 +163,10 @@ CREATE TABLE IF NOT EXISTS callbot.call_event (
   event_type    TEXT NOT NULL,                -- 事件类型（如 LEGAL_NOTICE_FAILED, HANDOFF, SENSITIVE_FIELD_BLOCKED）
   payload       JSONB NOT NULL DEFAULT '{}'::jsonb,  -- 事件详情（JSON 格式，灵活扩展）
   ts            TIMESTAMPTZ NOT NULL,         -- 事件时间戳
+  create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
+  update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user   TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
   PRIMARY KEY (event_id, user_id)
 ) PARTITION BY HASH (user_id);
 
@@ -200,7 +211,11 @@ CREATE TABLE IF NOT EXISTS callbot.call_artifact (
   sha256        TEXT,                          -- 文件哈希（完整性校验）
   size_bytes    BIGINT,                        -- 文件大小（字节）
   content_type  TEXT,                          -- MIME 类型（如 audio/wav）
-  ts            TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  ts            TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 文件创建时间
+  create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 记录创建时间
+  create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
+  update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user   TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
   PRIMARY KEY (artifact_id, user_id)
 ) PARTITION BY HASH (user_id);
 
@@ -240,7 +255,11 @@ CREATE TABLE IF NOT EXISTS callbot.config_snapshot (
   tts_profile_version TEXT,                    -- TTS 配置版本号
   dialplan_version TEXT,                       -- 拨号计划版本号
   snapshot      JSONB NOT NULL,               -- 完整配置快照（JSON 格式）
-  ts            TIMESTAMPTZ NOT NULL DEFAULT now()  -- 快照时间
+  ts            TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 快照时间
+  create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
+  update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user   TEXT NOT NULL DEFAULT 'system'        -- 最后更新人
 );
 
 -- 审计索引：按 call_id 查某通通话使用的配置快照
@@ -267,6 +286,10 @@ CREATE TABLE IF NOT EXISTS callbot.user_memory_fact (
   last_seen_ts  TIMESTAMPTZ NOT NULL,         -- 最近确认时间（每次命中时更新）
   source_call_id UUID,                         -- 来源通话 ID（审计维度：可追溯到具体通话）
   expire_ts     TIMESTAMPTZ,                  -- 过期时间（NULL=永不过期）
+  create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
+  update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user   TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
   PRIMARY KEY (id, user_id)
 ) PARTITION BY HASH (user_id);
 
@@ -306,6 +329,10 @@ CREATE TABLE IF NOT EXISTS callbot.user_memory_vector (
   source_call_id UUID,                         -- 来源通话 ID（审计维度：可追溯到具体通话）
   source_turn_id BIGINT,                       -- 来源轮次 ID
   ts            TIMESTAMPTZ NOT NULL,         -- 时间戳
+  create_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间
+  create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
+  update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
+  update_user   TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
   PRIMARY KEY (id, user_id)
 ) PARTITION BY HASH (user_id);
 
