@@ -1,3 +1,4 @@
+# DEPRECATED: 使用 memory/store.py (SQLAlchemy 2.0 async ORM)
 import psycopg
 from config import settings
 

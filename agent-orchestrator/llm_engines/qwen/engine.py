@@ -1,3 +1,4 @@
+# DEPRECATED: 使用 llm/service.py (LangChain ChatOpenAI)
 import logging
 import httpx
 

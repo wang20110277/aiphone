@@ -1,7 +1,7 @@
+"""三层记忆聚合器 - Redis 热记忆 + PG 事实 + PG 向量"""
 import logging
 from memory.redis_memory import RedisHotMemory
-from memory.pg_facts import get_recent_facts
-from memory.pg_vector import search_similar
+from memory.store import get_recent_facts
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ class MemoryAssembler:
     def __init__(self):
         self.redis = RedisHotMemory(settings.redis_url)
 
-    async def assemble(self, biz_type: str, user_key: str, current_input: str = "") -> str:
+    async def assemble(self, biz_type: str, user_key: str, user_input: str = "") -> str:
         parts = []
 
         hot_facts = self.redis.get_all_facts(biz_type, user_key)

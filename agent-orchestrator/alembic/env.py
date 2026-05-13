@@ -15,7 +15,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """离线模式：生成SQL脚本"""
+    """离线模式：生成 SQL 脚本"""
     url = settings.pg_dsn
     context.configure(
         url=url,

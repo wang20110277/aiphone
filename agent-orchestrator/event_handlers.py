@@ -1,27 +1,24 @@
+"""事件分发器 - 异步 LangGraph 集成 + MCP 身份核验"""
+import asyncio
 import time
-import json
 import logging
 from datetime import datetime
 from call_state import CallState, CallStateManager
-from fs_actions import FSActions, TTSProfileMap
+from fs_actions import FSActions
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Phase 3 临时规则引擎
-RULES = {
-    "marketing": "您好，感谢您的接听，请问有什么可以帮助您的？",
-    "customer_service": "您好，请问有什么可以帮您？",
-    "collection": "您好，这里有一笔账单需要确认。",
-}
-DEFAULT_REPLY = "抱歉，我没听清楚，请您再说一遍。"
-
 
 class EventDispatcher:
-    def __init__(self, state_mgr: CallStateManager, conn, actions: FSActions):
+    def __init__(self, state_mgr: CallStateManager, conn, actions: FSActions,
+                 graph, mcp_client=None):
         self.state_mgr = state_mgr
         self.conn = conn
         self.actions = actions
+        self.graph = graph
+        self.mcp_client = mcp_client
+        self._loop = asyncio.new_event_loop()
 
     def dispatch(self, event: dict):
         event_name = event.get("Event-Name", "")
@@ -37,11 +34,7 @@ class EventDispatcher:
 
     def handle_channel_create(self, event: dict):
         fs_uuid = event["Unique-ID"]
-        state = CallState(
-            fs_uuid=fs_uuid,
-            status="created",
-            start_time=time.time(),
-        )
+        state = CallState(fs_uuid=fs_uuid, status="created", start_time=time.time())
         self.state_mgr.set(fs_uuid, state)
         logger.info(f"[{fs_uuid}] CHANNEL_CREATE")
 
@@ -54,18 +47,25 @@ class EventDispatcher:
 
         state.status = "answered"
         state.answer_time = time.time()
-
         state.biz_type = event.get("variable_biz_type", "marketing")
         state.task_id = event.get("variable_task_id", "")
         state.core_user_id = event.get("variable_core_user_id", "")
         state.phone_hash = event.get("variable_phone_hash", "")
         state.user_key = f"{state.core_user_id}:{state.phone_hash}" if state.core_user_id else ""
 
+        if self.mcp_client and state.phone_hash:
+            try:
+                identity = asyncio.run_coroutine_threadsafe(
+                    self.mcp_client.query_user_identity(state.phone_hash, state.biz_type),
+                    self._loop,
+                ).result(timeout=5.0)
+                state.identity_verified = identity.verified
+            except Exception as e:
+                logger.warning(f"[{fs_uuid}] 身份核验失败: {e}")
+
         try:
             result = self.actions.play_legal_notice(fs_uuid)
             state.recording_notice_played = result
-            if not result:
-                logger.error(f"[{fs_uuid}] 录音告知播放失败")
         except Exception as e:
             logger.exception(f"[{fs_uuid}] 录音告知异常: {e}")
             state.recording_notice_played = False
@@ -94,34 +94,42 @@ class EventDispatcher:
 
         speech_text = event.get("speech", "") or ""
         if not speech_text.strip():
-            logger.debug(f"[{fs_uuid}] DETECTED_SPEECH: empty text")
             return
 
         logger.info(f"[{fs_uuid}] 用户发言: {speech_text[:50]}")
         state.silence_count = 0
         state.turn_count += 1
 
-        # LangGraph 流程
-        import asyncio
-        from graph_flow import create_call_graph
+        try:
+            result = asyncio.run_coroutine_threadsafe(
+                self.graph.ainvoke({
+                    "fs_uuid": state.fs_uuid,
+                    "biz_type": state.biz_type,
+                    "user_key": state.user_key,
+                    "user_id": state.core_user_id,
+                    "user_input": speech_text,
+                    "memory_block": "",
+                    "rag_block": "",
+                    "llm_action": None,
+                    "identity_verified": state.identity_verified,
+                    "do_not_call": False,
+                    "turn_count": state.turn_count,
+                    "turn_history": state.turn_history if hasattr(state, 'turn_history') else [],
+                    "handoff_reason": "",
+                }),
+                self._loop,
+            ).result(timeout=settings.llm_timeout_sec * 3)
+        except Exception as e:
+            logger.error(f"[{fs_uuid}] LangGraph 调用失败: {e}")
+            return
 
-        graph = create_call_graph()
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(graph.ainvoke({
-            "fs_uuid": state.fs_uuid,
-            "biz_type": state.biz_type,
-            "user_key": state.user_key,
-            "user_input": speech_text,
-            "memory_block": "",
-            "rag_block": "",
-            "llm_action": None,
-            "identity_verified": state.identity_verified,
-            "turn_count": state.turn_count,
-            "handoff_reason": "",
-        }))
         action = result.get("llm_action")
         if not action:
             return
+
+        if not hasattr(state, 'turn_history'):
+            state.turn_history = []
+        state.turn_history = result.get("turn_history", state.turn_history)
 
         if action.type in ("say", "ask"):
             self.actions.stop_detect_speech(fs_uuid)

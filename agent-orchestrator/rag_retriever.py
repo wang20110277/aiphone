@@ -1,3 +1,4 @@
+# DEPRECATED: 使用 rag/retriever.py (SQLAlchemy 2.0 async ORM)
 import logging
 import asyncio
 import asyncpg

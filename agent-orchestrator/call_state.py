@@ -22,6 +22,7 @@ class CallState:
     recording_path: str = ""
     start_time: float = 0.0
     answer_time: float = 0.0
+    turn_history: list = field(default_factory=list)
     last_action: Optional[dict] = None
     created_at: datetime = field(default_factory=datetime.now)
 

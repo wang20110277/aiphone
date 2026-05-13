@@ -1,6 +1,7 @@
+"""合规检查 - 催收敏感字段拦截 + 营销 do_not_call"""
 import re
 import logging
-from llm_base import LLMAction
+from llm.service import LLMAction
 
 logger = logging.getLogger(__name__)
 

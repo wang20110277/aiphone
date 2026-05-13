@@ -1,4 +1,8 @@
-def build_prompt(
+"""Prompt 组装 - LangChain 消息列表格式"""
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+
+def build_messages(
     biz_type: str,
     system_prompt: str,
     user_input: str,
@@ -6,24 +10,28 @@ def build_prompt(
     rag_block: str = "",
     turn_history: list[dict] | None = None,
     max_history_turns: int = 10,
-) -> str:
+) -> list:
+    """组装 LangChain 消息列表：system + RAG + memory + history + user"""
     parts = [system_prompt]
 
     if rag_block:
-        parts.append(f"\n{rag_block}")
+        parts.append(rag_block)
 
     if memory_block:
-        parts.append(f"\n{memory_block}")
+        parts.append(memory_block)
+
+    system_content = "\n\n".join(parts)
+    messages = [SystemMessage(content=system_content)]
 
     if turn_history:
         recent = turn_history[-max_history_turns:]
-        history_lines = []
         for turn in recent:
-            role = "用户" if turn["role"] == "user" else "助手"
-            history_lines.append(f"{role}: {turn['text']}")
-        parts.append("\n## 对话历史\n" + "\n".join(history_lines))
+            role = turn.get("role", "user")
+            text = turn.get("text", "")
+            if role == "user":
+                messages.append(HumanMessage(content=text))
+            elif role == "assistant":
+                messages.append(AIMessage(content=text))
 
-    parts.append(f"\n用户: {user_input}")
-    parts.append("\n请以JSON格式回复: {\"action\": \"...\", \"text\": \"...\", \"intent\": \"...\"}")
-
-    return "\n".join(parts)
+    messages.append(HumanMessage(content=user_input))
+    return messages
