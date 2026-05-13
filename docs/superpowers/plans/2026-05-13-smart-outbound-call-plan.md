@@ -48,27 +48,29 @@ CREATE EXTENSION IF NOT EXISTS vector;        -- pgvector 向量检索扩展
 -- ========================================
 
 -- ========================================
--- 2. 通话会话表（事实主表）
+-- 2. 通话会话表（事实主表，按月分区）
 --    记录每通通话的完整生命周期
+--    业务量大，每通通话一条记录，按 start_ts 月分区
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.call_session (
-  call_id            UUID PRIMARY KEY,        -- 通话唯一标识（系统生成）
-  fs_uuid            UUID UNIQUE NOT NULL,    -- FreeSWITCH 会话唯一标识
+  call_id            UUID NOT NULL,           -- 通话唯一标识（系统生成）
+  fs_uuid            UUID NOT NULL,           -- FreeSWITCH 会话唯一标识
   biz_type           TEXT NOT NULL CHECK (biz_type IN ('customer_service','collection','marketing')),  -- 业务类型：客服/催收/营销
   task_id            TEXT,                     -- 外呼任务 ID（来自任务调度系统）
   user_id            TEXT NOT NULL,           -- 用户 ID（来自用户中心，审计主维度）
   phone_hash         TEXT NOT NULL,           -- 手机号加盐哈希（不存明文）
   user_key           TEXT NOT NULL,           -- 复合用户标识：user_id:phone_hash（业务查询用）
   phone_masked       TEXT,                     -- 脱敏手机号（如 138****1234）
-  start_ts           TIMESTAMPTZ NOT NULL,    -- 通话开始时间
+  start_ts           TIMESTAMPTZ NOT NULL,    -- 通话开始时间（分区键）
   end_ts             TIMESTAMPTZ,             -- 通话结束时间（挂断时更新）
   result_code        TEXT,                     -- 通话结果编码（normal_end/user_busy/no_answer 等）
   hangup_cause       TEXT,                     -- 挂机原因（对应 SIP Hangup-Cause）
   identity_verified  BOOLEAN NOT NULL DEFAULT FALSE,  -- 身份核验是否通过
   verify_attempts    INT NOT NULL DEFAULT 0,  -- 核验尝试次数
   recording_notice_played BOOLEAN NOT NULL DEFAULT FALSE,  -- 录音告知是否已播放（合规关键）
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()  -- 记录创建时间
-);
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 记录创建时间
+  PRIMARY KEY (call_id, start_ts)
+) PARTITION BY RANGE (start_ts);
 
 -- 审计索引：按 user_id 查某用户所有通话历史
 CREATE INDEX IF NOT EXISTS idx_call_session_user_start
@@ -82,6 +84,14 @@ CREATE INDEX IF NOT EXISTS idx_call_session_biz_start
 -- 业务索引：按任务维度查询通话记录
 CREATE INDEX IF NOT EXISTS idx_call_session_task_start
   ON callbot.call_session (biz_type, task_id, start_ts DESC);
+
+-- 按月分区（示例：2026年5月、6月，生产环境需按月自动创建）
+CREATE TABLE IF NOT EXISTS callbot.call_session_202605
+  PARTITION OF callbot.call_session
+  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE IF NOT EXISTS callbot.call_session_202606
+  PARTITION OF callbot.call_session
+  FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
 
 -- ========================================
 -- 3. 逐轮对话表（按月分区）
@@ -157,11 +167,12 @@ CREATE TABLE IF NOT EXISTS callbot.call_event_202605
   FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
 
 -- ========================================
--- 5. 录音/音频产物表
+-- 5. 录音/音频产物表（按月分区）
 --    记录所有录音文件和 TTS 音频的存储位置与元数据
+--    每通通话产生多个音频文件，数据量大，按 ts 月分区
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.call_artifact (
-  artifact_id   BIGSERIAL PRIMARY KEY,        -- 产物自增 ID
+  artifact_id   BIGSERIAL,                   -- 产物自增 ID
   call_id       UUID NOT NULL,                -- 关联通话会话（审计维度：通话维度）
   fs_uuid       UUID NOT NULL,                -- FreeSWITCH 会话标识
   biz_type      TEXT NOT NULL,                -- 业务类型（审计维度：业务维度）
@@ -173,8 +184,9 @@ CREATE TABLE IF NOT EXISTS callbot.call_artifact (
   sha256        TEXT,                          -- 文件哈希（完整性校验）
   size_bytes    BIGINT,                        -- 文件大小（字节）
   content_type  TEXT,                          -- MIME 类型（如 audio/wav）
-  ts            TIMESTAMPTZ NOT NULL DEFAULT now()  -- 创建时间
-);
+  ts            TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 创建时间（分区键）
+  PRIMARY KEY (artifact_id, ts)
+) PARTITION BY RANGE (ts);
 
 -- 审计索引：按 call_id + kind 查某通通话的所有录音文件
 CREATE INDEX IF NOT EXISTS idx_artifact_call
@@ -185,6 +197,11 @@ CREATE INDEX IF NOT EXISTS idx_artifact_user_ts
 -- 审计索引：按 biz_type + 时间范围 查业务线录音量
 CREATE INDEX IF NOT EXISTS idx_artifact_biz_ts
   ON callbot.call_artifact (biz_type, ts DESC);
+
+-- 按月分区
+CREATE TABLE IF NOT EXISTS callbot.call_artifact_202605
+  PARTITION OF callbot.call_artifact
+  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
 
 -- ========================================
 -- 6. 配置快照表
@@ -213,22 +230,24 @@ CREATE INDEX IF NOT EXISTS idx_snapshot_user_ts
   ON callbot.config_snapshot (user_id, ts DESC);
 
 -- ========================================
--- 7. 结构化记忆表（mem0 facts）
+-- 7. 结构化记忆表（mem0 facts，按月分区）
 --    存储从对话中抽取的结构化事实（用户偏好、核验状态等）
+--    随用户量增长数据量大，按 first_seen_ts 月分区（不可变字段，避免行迁移）
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.user_memory_fact (
-  id            BIGSERIAL PRIMARY KEY,        -- 记忆自增 ID
+  id            BIGSERIAL,                   -- 记忆自增 ID
   biz_type      TEXT NOT NULL,                -- 业务类型（审计维度：业务维度，记忆按业务隔离）
   user_id       TEXT NOT NULL,               -- 用户 ID（审计维度：用户维度）
   user_key      TEXT NOT NULL,               -- 复合用户标识
   fact_type     TEXT NOT NULL,                -- 事实类型（如 do_not_call/preferred_contact_time/identity_verified）
   fact_value    JSONB NOT NULL,               -- 事实内容（JSON 格式，支持复杂结构）
   confidence    REAL,                          -- 置信度（规则抽取=1.0，LLM 抽取<1.0）
-  first_seen_ts TIMESTAMPTZ NOT NULL,         -- 首次发现时间
+  first_seen_ts TIMESTAMPTZ NOT NULL,         -- 首次发现时间（分区键，不可变）
   last_seen_ts  TIMESTAMPTZ NOT NULL,         -- 最近确认时间（每次命中时更新）
   source_call_id UUID,                         -- 来源通话 ID（审计维度：可追溯到具体通话）
-  expire_ts     TIMESTAMPTZ                    -- 过期时间（NULL=永不过期）
-);
+  expire_ts     TIMESTAMPTZ,                  -- 过期时间（NULL=永不过期）
+  PRIMARY KEY (id, first_seen_ts)
+) PARTITION BY RANGE (first_seen_ts);
 
 -- 审计索引：按 user_id 查某用户的所有记忆
 CREATE INDEX IF NOT EXISTS idx_mem_fact_user
@@ -239,6 +258,11 @@ CREATE INDEX IF NOT EXISTS idx_mem_fact_user_biz
 -- 业务索引：按最近确认时间排序（用于召回最新记忆）
 CREATE INDEX IF NOT EXISTS idx_mem_fact_lastseen
   ON callbot.user_memory_fact (biz_type, user_key, last_seen_ts DESC);
+
+-- 按月分区
+CREATE TABLE IF NOT EXISTS callbot.user_memory_fact_202605
+  PARTITION OF callbot.user_memory_fact
+  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
 
 -- ========================================
 -- 8. 向量记忆表（pgvector，按月分区）
