@@ -46,14 +46,18 @@ CREATE EXTENSION IF NOT EXISTS vector;        -- pgvector 向量检索扩展
 --   3. 按 call_id 查某通通话的完整数据（全链路追溯）
 --   4. 按 user_id + biz_type 查某用户在某业务线的记录（交叉审计）
 --
--- 分表策略：
---   优先按 user_id HASH 分表，数据按用户均匀分布
---   优势：用户维度查询天然路由到单分片，便于后续同步数仓按用户维度拆分
---   config_snapshot 数据量小不做分表
+-- 分库分表策略（应用层路由，PostgreSQL 无原生分库）：
+--   分库：4 个 PostgreSQL 数据库 callbot_0~callbot_3，按 hash(user_id) % 4 路由到库
+--   分表：每库内 PARTITION BY HASH(user_id)，按 hash(user_id) % N 路由到分片
+--   优势：用户维度查询天然路由到单库单分片，便于后续同步数仓按用户维度拆分
+--   config_snapshot 数据量小不做分库分表，放 callbot_0
 --
---   测试环境：MODULUS 4（4分片，p0~p3）
---   生产环境：MODULUS 128（128分片，p0~p127）
---   以下 DDL 以测试环境 4 分片为例，生产部署时需替换为 128 分片
+--   测试环境：1 库 + MODULUS 4（4分片，p0~p3）
+--   生产环境：4 库 + 每库 MODULUS 128（128分片，p0~p127）
+--   以下 DDL 以测试环境为例，生产部署时需：
+--     1. 创建 callbot_0~callbot_3 四个数据库
+--     2. 每库执行建表语句（MODULUS 改为 128，REMAINDER 0~127）
+--     3. 应用层路由逻辑：db_index = hash(user_id) % 4
 -- ========================================
 
 -- ========================================
