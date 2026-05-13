@@ -1,0 +1,15 @@
+[Unit]
+Description=VibeVoice TTS Adapter Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mrcp-tts/adapter
+ExecStart=/opt/mrcp-tts/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8081
+Restart=always
+RestartSec=5
+Environment=PYTHONPATH=/opt/mrcp-tts
+
+[Install]
+WantedBy=multi-user.target

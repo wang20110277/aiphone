@@ -1,0 +1,15 @@
+[Unit]
+Description=VibeVoice ASR Adapter Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mrcp-asr/adapter
+ExecStart=/opt/mrcp-asr/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=5
+Environment=PYTHONPATH=/opt/mrcp-asr
+
+[Install]
+WantedBy=multi-user.target
