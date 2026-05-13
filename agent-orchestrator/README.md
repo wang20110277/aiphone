@@ -1,3 +1,3 @@
 - pip install modelscope
 - Qwen3.5-9B（GPU2）：GPU×1、CPU 32C、内存 128GB
-- modelscope download --model Qwen/Qwen3.5-9B
+- modelscope download --model Qwen/Qwen3.5-9B --local_dir .checkpoints/Qwen3.5-9B
