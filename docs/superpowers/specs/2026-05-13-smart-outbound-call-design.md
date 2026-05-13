@@ -45,27 +45,37 @@ aiphone/
 │   │   └── public.xml
 │   └── unimrcp/
 │       └── unimrcpserver.xml
-├── mrcp-asr/                 # Phase 2 - ASR 适配层（待实现）
+├── mrcp-asr/                 # Phase 2 - ASR 适配层（可插拔引擎）
 │   ├── src/
 │   │   ├── asr_engine.c      # UniMRCP ASR 引擎插件（C）
 │   │   └── asr_engine.h
 │   ├── adapter/
 │   │   ├── main.py           # FastAPI 入口
-│   │   ├── asr_service.py    # VibeVoice ASR 封装
-│   │   ├── config.py
+│   │   ├── base.py           # 抽象 ASR Engine 接口
+│   │   ├── engines/          # 引擎实现（可插拔）
+│   │   │   ├── vibevoice/    # VibeVoice ASR（默认）
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── engine.py
+│   │   │   └── ...           # 未来可扩展（阿里云、讯飞等）
+│   │   ├── config.py         # 引擎选择配置
 │   │   └── requirements.txt
 │   ├── deploy/
 │   │   ├── vibevoice-asr.service
 │   │   └── install.sh
 │   └── README.md
-├── mrcp-tts/                 # Phase 2 - TTS 适配层（待实现）
+├── mrcp-tts/                 # Phase 2 - TTS 适配层（可插拔引擎）
 │   ├── src/
 │   │   ├── tts_engine.c      # UniMRCP TTS 引擎插件（C）
 │   │   └── tts_engine.h
 │   ├── adapter/
 │   │   ├── main.py           # FastAPI 入口
-│   │   ├── tts_service.py    # VibeVoice TTS 封装
-│   │   ├── config.py
+│   │   ├── base.py           # 抽象 TTS Engine 接口
+│   │   ├── engines/          # 引擎实现（可插拔）
+│   │   │   ├── vibevoice/    # VibeVoice TTS（默认）
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── engine.py
+│   │   │   └── ...           # 未来可扩展（阿里云、讯飞等）
+│   │   ├── config.py         # 引擎选择配置
 │   │   └── requirements.txt
 │   ├── deploy/
 │   │   ├── vibevoice-tts.service
@@ -145,30 +155,74 @@ aiphone/
 
 ---
 
-## 4. Phase 2: ASR/TTS 适配层
+## 4. Phase 2: ASR/TTS 适配层（可插拔引擎）
 
 ### 目标
 
-实现 UniMRCP → VibeVoice 的 Python 代理适配服务。
+实现 UniMRCP → Python 代理适配服务，**引擎可插拔切换**。VibeVoice 作为默认实现，后续可扩展阿里云、讯飞等其他引擎。
 
 ### 架构链路
 
 ```
-FreeSWITCH (mod_unimrcp) → UniMRCP Server → [Python 适配服务] → VibeVoice 模型
+FreeSWITCH (mod_unimrcp) → UniMRCP Server → [Python 适配服务] → Engine（可插拔）
+                                                         ├→ VibeVoice（默认）
+                                                         ├→ 阿里云 ASR/TTS（未来）
+                                                         └→ 讯飞 ASR/TTS（未来）
 ```
 
 UniMRCP Server 通过 C 引擎插件（薄 C 层）将 MRCPv2 请求转发为 HTTP 调用，Python 适配服务就是 `unimrcpserver.xml` 中 `backend-url` 指向的目标。
 
+### 可插拔引擎设计
+
+通过抽象基类定义统一接口，具体引擎在 `engines/` 目录下独立实现，通过配置文件切换：
+
+```python
+# adapter/base.py - ASR 抽象接口
+class ASREngine(ABC):
+    @abstractmethod
+    async def recognize(self, audio_stream, params: dict) -> ASRResult:
+        """接收音频流，返回识别结果"""
+
+    @abstractmethod
+    async def health_check(self) -> bool: ...
+
+# adapter/base.py - TTS 抽象接口
+class TTSEngine(ABC):
+    @abstractmethod
+    async def synthesize(self, text: str, params: dict) -> TTSResult:
+        """接收文本，返回合成音频"""
+
+    @abstractmethod
+    async def health_check(self) -> bool: ...
+```
+
+```yaml
+# adapter/config.yaml - 引擎选择
+engine:
+  asr: vibevoice          # 可切换为 aliyun / xfyun / ...
+  tts: vibevoice
+```
+
+```python
+# adapter/main.py - 引擎加载
+engine = load_engine(config.engine.asr)  # 反射加载 engines/{name}/engine.py
+```
+
+**扩展新引擎只需：**
+1. 在 `engines/` 下新建目录，实现 `ASREngine` 或 `TTSEngine` 接口
+2. 修改 `config.yaml` 中的引擎名称
+3. 无需改动 FastAPI 入口和 UniMRCP C 插件
+
 ### ASR 适配服务（mrcp-asr/）
 
-FastAPI 服务，端口 8080，GPU0。
+FastAPI 服务，端口 8080，GPU0（VibeVoice 模式）。
 
 **端点：**
-- `POST /asr/recognize` — 接收音频流，调 VibeVoice ASR，返回识别文本
+- `POST /asr/recognize` — 接收音频流，调当前引擎 ASR，返回识别文本
 - `GET /healthz` — 健康检查
 - `GET /metrics` — Prometheus 指标
 
-**关键设计：**
+**VibeVoice 引擎实现关键设计：**
 - 启动时加载 VibeVoice-ASR 模型到 GPU0（CUDA_VISIBLE_DEVICES=0）
 - 支持流式音频输入（chunked transfer）
 - 返回 JSON：`{"text": "...", "confidence": 0.95, "is_final": true}`
@@ -178,14 +232,14 @@ FastAPI 服务，端口 8080，GPU0。
 
 ### TTS 适配服务（mrcp-tts/）
 
-FastAPI 服务，端口 8080，GPU1。
+FastAPI 服务，端口 8080，GPU1（VibeVoice 模式）。
 
 **端点：**
 - `POST /tts/synthesize` — 接收文本 + voice_id/speed/volume/pitch，返回音频
 - `GET /healthz` — 健康检查
 - `GET /metrics` — Prometheus 指标
 
-**关键设计：**
+**VibeVoice 引擎实现关键设计：**
 - 启动时加载 VibeVoice-TTS 模型到 GPU1（CUDA_VISIBLE_DEVICES=1）
 - 三业务 profile 强隔离：
   - 请求参数含 `biz_type`，映射到对应 voice_id/speed/volume/pitch
@@ -201,12 +255,14 @@ FastAPI 服务，端口 8080，GPU1。
 - 接收 MRCPv2 会话（SIP/MRCP 信令 + RTP 媒体流）
 - 把音频流以 HTTP POST 发送给 Python 适配服务
 - 把 Python 返回的文本/音频转回 MRCP 响应
+- C 层不感知具体引擎，只与 Python 适配服务的 HTTP 接口交互
 
 ### 验收标准
 
 - UniMRCP 调用 VibeVoice ASR 返回文本（MRCP 链路端到端通）
 - UniMRCP 调用 VibeVoice TTS 返回音频（不同 biz_type 音色不同）
 - `/healthz` 返回 200，`/metrics` 可访问
+- 引擎可配置切换（config.yaml 修改后重启生效）
 
 ---
 
@@ -600,7 +656,7 @@ def compliance_check(action: LLMAction, state: CallState) -> LLMAction:
 | Phase | 交付物 | 验收标准 |
 |-------|--------|----------|
 | 1 | deploy/ 安装脚本 + DDL | FS/UniMRCP/PG/Redis/MinIO 全部就绪 |
-| 2 | mrcp-asr/ + mrcp-tts/ 适配层 | MRCPv2 → VibeVoice ASR/TTS 端到端通 |
+| 2 | mrcp-asr/ + mrcp-tts/ 可插拔适配层 | MRCPv2 → 引擎 ASR/TTS 端到端通，引擎可配置切换 |
 | 3 | agent-orchestrator/ 核心代码 | ESL 事件循环 + detect_speech 对话循环正常 |
 | 4 | llm_qwen.py + prompts/ | Qwen 结构化输出，三个 biz_type 风格差异明显 |
 | 5 | graph_flow.py | LangGraph 多节点流转，合规门禁正常 |
