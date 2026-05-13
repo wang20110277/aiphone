@@ -66,7 +66,8 @@ CREATE EXTENSION IF NOT EXISTS vector;        -- pgvector 向量检索扩展
 --    按 user_id HASH 4分片，用户维度查询天然路由到单分片
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.call_session (
-  call_id            UUID NOT NULL,           -- 通话唯一标识（系统生成）
+  id                 BIGSERIAL,                  -- 主键自增 ID
+  call_id            UUID NOT NULL,           -- 通话业务标识（系统生成，供子表关联）
   fs_uuid            UUID NOT NULL,           -- FreeSWITCH 会话唯一标识
   biz_type           TEXT NOT NULL CHECK (biz_type IN ('customer_service','collection','marketing')),  -- 业务类型：客服/催收/营销
   task_id            TEXT,                     -- 外呼任务 ID（来自任务调度系统）
@@ -85,9 +86,12 @@ CREATE TABLE IF NOT EXISTS callbot.call_session (
   create_user       TEXT NOT NULL DEFAULT 'system',       -- 创建人（系统自动 / 运维人员）
   update_time       TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
   update_user       TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
-  PRIMARY KEY (call_id, user_id)
+  PRIMARY KEY (id, user_id)
 ) PARTITION BY HASH (user_id);
 
+-- 业务索引：按 call_id 唯一约束（业务关联键）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_call_session_call_id
+  ON callbot.call_session (call_id);
 -- 审计索引：按 user_id 查某用户所有通话历史
 CREATE INDEX IF NOT EXISTS idx_call_session_user_start
   ON callbot.call_session (user_id, start_ts DESC);
@@ -117,7 +121,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_session_p3
 --    数据量最大（每轮对话一条），按 user_id HASH 4分片
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.call_turn (
-  turn_id        BIGSERIAL,                   -- 轮次自增 ID
+  id             BIGSERIAL,                   -- 主键自增 ID
   call_id        UUID NOT NULL,               -- 关联通话会话（审计维度：通话维度）
   fs_uuid        UUID NOT NULL,               -- FreeSWITCH 会话标识（便于排查）
   biz_type       TEXT NOT NULL,               -- 业务类型（审计维度：业务维度）
@@ -133,7 +137,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_turn (
   create_user    TEXT NOT NULL DEFAULT 'system',       -- 创建人
   update_time    TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
   update_user    TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
-  PRIMARY KEY (turn_id, user_id)
+  PRIMARY KEY (id, user_id)
 ) PARTITION BY HASH (user_id);
 
 -- 审计索引：按 call_id 查某通通话的所有轮次（全链路追溯）
@@ -162,7 +166,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_turn_p3
 --    按 user_id HASH 4分片
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.call_event (
-  event_id      BIGSERIAL,                    -- 事件自增 ID
+  id            BIGSERIAL,                    -- 主键自增 ID
   call_id       UUID NOT NULL,                -- 关联通话会话（审计维度：通话维度）
   fs_uuid       UUID NOT NULL,                -- FreeSWITCH 会话标识
   biz_type      TEXT NOT NULL,                -- 业务类型（审计维度：业务维度）
@@ -175,7 +179,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_event (
   create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
   update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
   update_user   TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
-  PRIMARY KEY (event_id, user_id)
+  PRIMARY KEY (id, user_id)
 ) PARTITION BY HASH (user_id);
 
 -- 审计索引：按 call_id 查某通通话的事件流（全链路追溯）
@@ -207,7 +211,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_event_p3
 --    每通通话产生多个音频文件，按 user_id HASH 4分片
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.call_artifact (
-  artifact_id   BIGSERIAL,                   -- 产物自增 ID
+  id            BIGSERIAL,                   -- 主键自增 ID
   call_id       UUID NOT NULL,                -- 关联通话会话（审计维度：通话维度）
   fs_uuid       UUID NOT NULL,                -- FreeSWITCH 会话标识
   biz_type      TEXT NOT NULL,                -- 业务类型（审计维度：业务维度）
@@ -224,7 +228,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_artifact (
   create_user   TEXT NOT NULL DEFAULT 'system',       -- 创建人
   update_time   TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 最后更新时间
   update_user   TEXT NOT NULL DEFAULT 'system',       -- 最后更新人
-  PRIMARY KEY (artifact_id, user_id)
+  PRIMARY KEY (id, user_id)
 ) PARTITION BY HASH (user_id);
 
 -- 审计索引：按 call_id + kind 查某通通话的所有录音文件
@@ -252,7 +256,7 @@ CREATE TABLE IF NOT EXISTS callbot.call_artifact_p3
 --    每通通话开始时冻结 Prompt/Flow/TTS/Dialplan 版本，确保可追溯
 -- ========================================
 CREATE TABLE IF NOT EXISTS callbot.config_snapshot (
-  snapshot_id   BIGSERIAL PRIMARY KEY,        -- 快照自增 ID
+  id            BIGSERIAL PRIMARY KEY,        -- 主键自增 ID
   call_id       UUID NOT NULL,                -- 关联通话会话（审计维度：通话维度）
   fs_uuid       UUID NOT NULL,                -- FreeSWITCH 会话标识
   biz_type      TEXT NOT NULL,                -- 业务类型（审计维度：业务维度）
