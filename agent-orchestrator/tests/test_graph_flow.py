@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from langchain_core.messages import HumanMessage, AIMessage
 from graph.flow import CallGraphState, create_call_graph
 
 
@@ -17,8 +18,7 @@ def _make_state(**overrides) -> dict:
         "llm_action": None,
         "tts_minio_key": None,
         "tts_audio": None,
-        "turn_count": 0,
-        "turn_history": [],
+        "chat_history": [],
     }
     base.update(overrides)
     return base
@@ -35,13 +35,21 @@ async def test_route_credit_query_only_marketing():
 @pytest.mark.asyncio
 async def test_receive_asr_node():
     from graph.flow import receive_asr_node
-    state = _make_state()
-    with patch("graph.flow.load_context", new=AsyncMock(return_value={"turn_history": [{"role": "user", "text": "hi"}], "turn_count": 1, "identity": None})):
-        result = await receive_asr_node(state)
+    mock_history = MagicMock()
+    mock_history.aget_messages = AsyncMock(return_value=[HumanMessage(content="hi")])
+    with patch("graph.flow.get_chat_history", return_value=mock_history):
+        result = await receive_asr_node(_make_state())
     assert result["user_input"] == "我想咨询一下"
     assert result["asr_minio_key"] == "asr/20260514/test.wav"
-    assert result["turn_count"] == 1
-    assert len(result["turn_history"]) == 1
+    assert len(result["chat_history"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_receive_asr_node_history_load_failure():
+    from graph.flow import receive_asr_node
+    with patch("graph.flow.get_chat_history", side_effect=Exception("redis down")):
+        result = await receive_asr_node(_make_state())
+    assert result["chat_history"] == []
 
 
 @pytest.mark.asyncio
@@ -86,14 +94,15 @@ async def test_tts_synthesize_node_success():
     mock_tts.synthesize = AsyncMock(return_value={
         "audio": "dGVzdA==", "minio_key": "tts/20260514/test.wav", "content_type": "audio/wav"
     })
+    mock_history = MagicMock()
     mock_action = MagicMock()
     mock_action.text = "您好，有什么可以帮您？"
     with patch("graph.flow._tts_client", mock_tts), \
-         patch("graph.flow.save_context", new=AsyncMock()):
-        result = await tts_synthesize_node(_make_state(llm_action=mock_action, turn_count=0))
+         patch("graph.flow.get_chat_history", return_value=mock_history), \
+         patch("graph.flow.save_turn", new=AsyncMock()):
+        result = await tts_synthesize_node(_make_state(llm_action=mock_action))
     assert result["tts_audio"] == "dGVzdA=="
     assert result["tts_minio_key"] == "tts/20260514/test.wav"
-    assert result["turn_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -104,11 +113,10 @@ async def test_tts_synthesize_node_failure_graceful():
     mock_action = MagicMock()
     mock_action.text = "您好"
     with patch("graph.flow._tts_client", mock_tts), \
-         patch("graph.flow.save_context", new=AsyncMock()):
+         patch("graph.flow.get_chat_history", side_effect=Exception("redis down")):
         result = await tts_synthesize_node(_make_state(llm_action=mock_action))
     assert result["tts_audio"] is None
     assert result["tts_minio_key"] is None
-    assert result["turn_count"] == 1
 
 
 @pytest.mark.asyncio

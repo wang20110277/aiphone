@@ -12,6 +12,7 @@ def _mock_graph_result():
         "llm_action": action,
         "tts_audio": "dGVzdA==",
         "tts_minio_key": "tts/20260514/test.wav",
+        "chat_history": [],
     }
 
 
