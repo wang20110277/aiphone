@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # MCP
     mcp_server_url: str = "http://127.0.0.1:9090"
 
+    # RAG
+    rag_top_k: int = 3
+    rag_similarity_threshold: float = 0.7
+    rag_max_retries: int = 2
+
     model_config = {"env_prefix": "CALLBOT_", "env_file": ".env", "extra": "ignore"}
 
 

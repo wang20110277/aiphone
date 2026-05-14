@@ -8,7 +8,8 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage
 
 from llm.service import LLMAction, FALLBACK_ACTION_TEXT, get_llm_service
-from rag.retriever import retrieve_scripts, build_rag_block
+from config import settings
+from rag.retriever import retrieve_scripts, build_rag_block, should_retrieve, grade_documents, rewrite_query
 from graph.prompt import build_messages
 from memory.assembler import MemoryAssembler
 from memory.chat_history import get_chat_history, save_turn
@@ -40,6 +41,8 @@ class CallGraphState(TypedDict, total=False):
     credit_result: dict | None
     memory_block: str
     rag_block: str
+    rag_retry_count: int
+    rag_query: str
     llm_action: LLMAction | None
     tts_minio_key: str | None
     tts_audio: str | None
@@ -120,11 +123,27 @@ async def recall_memory_node(state: CallGraphState) -> dict:
 
 async def rag_retrieve_node(state: CallGraphState) -> dict:
     try:
-        scripts = await retrieve_scripts(
-            biz_type=state["biz_type"],
-            user_input=state["user_input"],
-        )
-        return {"rag_block": build_rag_block(scripts)}
+        rag_query = state["user_input"]
+
+        # Adaptive: check if retrieval is needed
+        need_retrieve = await should_retrieve(rag_query, state["biz_type"])
+        if not need_retrieve:
+            return {"rag_block": ""}
+
+        # Corrective loop: retrieve -> grade -> rewrite -> retry
+        for attempt in range(settings.rag_max_retries + 1):
+            scripts = await retrieve_scripts(state["biz_type"], rag_query)
+
+            if scripts:
+                relevant = await grade_documents(rag_query, scripts)
+                if relevant:
+                    return {"rag_block": build_rag_block(relevant)}
+
+            # Rewrite query for next attempt
+            if attempt < settings.rag_max_retries:
+                rag_query = await rewrite_query(rag_query, scripts or [])
+
+        return {"rag_block": ""}
     except Exception as e:
         logger.error(f"[{state.get('call_id', '?')}] RAG 检索失败: {e}")
         return {"rag_block": ""}
