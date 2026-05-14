@@ -4,7 +4,6 @@ import yaml
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, Form
-from adapter.base import ASRResult
 from adapter.config import load_asr_engine
 from adapter import storage
 
