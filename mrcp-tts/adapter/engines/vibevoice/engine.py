@@ -54,3 +54,6 @@ class VibeVoiceTTSEngine(TTSEngine):
 
     async def health_check(self) -> bool:
         return self._model_loaded
+
+
+Engine = VibeVoiceTTSEngine
