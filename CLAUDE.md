@@ -16,8 +16,8 @@ cd agent-asr && PYTHONPATH=$(pwd) pytest tests/ -v
 # TTS adapter (must cd first)
 cd agent-tts && PYTHONPATH=$(pwd) pytest tests/ -v
 
-# Orchestrator
-cd agent-orchestrator && PYTHONPATH=$(pwd) pytest tests/ -v
+# Orchestrator (source in src/)
+cd agent-orchestrator && PYTHONPATH=$(pwd)/src pytest tests/ -v
 
 # Run single test file
 cd agent-asr && PYTHONPATH=$(pwd) pytest tests/engines/sensevoice/test_engine.py -v
@@ -31,13 +31,13 @@ cd agent-asr/adapter && PYTHONPATH=$(cd .. && pwd) uvicorn main:app --host 0.0.0
 # TTS adapter (port 8081)
 cd agent-tts/adapter && PYTHONPATH=$(cd .. && pwd) uvicorn main:app --host 0.0.0.0 --port 8081
 
-# Orchestrator
-cd agent-orchestrator && PYTHONPATH=$(pwd) uvicorn main:app --host 0.0.0.0 --port 8000
+# Orchestrator (source in src/)
+cd agent-orchestrator && PYTHONPATH=$(pwd)/src uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ### DB Migrations
 ```bash
-cd agent-orchestrator && alembic upgrade head
+cd agent-orchestrator && PYTHONPATH=$(pwd)/src alembic upgrade head
 ```
 
 ## Architecture
@@ -147,18 +147,19 @@ aiphone/
 │   │   └── engines/     # cosyvoice/, vibevoice/
 │   └── tests/
 ├── agent-orchestrator/  # LangGraph 7-node pipeline (FastAPI HTTP service)
-│   ├── main.py          # FastAPI entry point
-│   ├── config.py        # pydantic-settings
-│   ├── database.py      # SQLAlchemy async engine
-│   ├── clients/         # mcp.py, tts.py
-│   ├── graph/           # flow.py, prompt.py
-│   ├── llm/             # service.py (ChatOpenAI + structured output)
-│   ├── memory/          # assembler.py, chat_history.py, redis_memory.py, store.py
-│   ├── rag/             # retriever.py (Agentic RAG)
-│   ├── db/              # models.py (ORM)
-│   ├── storage/         # repository.py
-│   ├── prompts/         # {biz_type}.yaml
-│   └── alembic/         # DB migrations
+│   ├── src/             # 核心源码 (PYTHONPATH=src)
+│   │   ├── main.py      # FastAPI entry point
+│   │   ├── config.py    # pydantic-settings
+│   │   ├── database.py  # SQLAlchemy async engine
+│   │   ├── clients/     # mcp.py, tts.py
+│   │   ├── graph/       # flow.py, prompt.py, prompts/
+│   │   ├── llm/         # service.py (ChatOpenAI + structured output)
+│   │   ├── memory/      # assembler.py, chat_history.py, redis_memory.py, store.py
+│   │   ├── rag/         # retriever.py (Agentic RAG)
+│   │   ├── db/          # models.py (ORM)
+│   │   └── storage/     # repository.py
+│   ├── alembic/         # DB migrations
+│   └── tests/           # test suite
 ├── deploy/              # systemd services, install scripts, monitoring
 ├── freeswitch/          # FreeSWITCH + UniMRCP configs
 └── docs/                # design specs, implementation plans
