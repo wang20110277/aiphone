@@ -15,6 +15,8 @@ def _make_state(**overrides) -> dict:
         "credit_result": None,
         "memory_block": "",
         "rag_block": "",
+        "rag_retry_count": 0,
+        "rag_query": "",
         "llm_action": None,
         "tts_minio_key": None,
         "tts_audio": None,
