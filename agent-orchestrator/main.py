@@ -4,7 +4,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from fastapi import HTTPException
+
 from config import settings
+from database import engine as db_engine
 from graph_flow import create_call_graph, set_services, CallGraphState
 from memory.assembler import MemoryAssembler
 from mcp_client import MCPClient
@@ -57,6 +60,9 @@ async def healthz():
 
 @app.post("/call/speech")
 async def handle_speech(request: SpeechRequest):
+    if _graph is None:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
     initial_state: CallGraphState = {
         "call_id": request.call_id,
         "biz_type": request.biz_type,
