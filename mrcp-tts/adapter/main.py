@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Form
 from fastapi.responses import Response
 from adapter.config import load_tts_engine
+from adapter import storage
 
 logger = logging.getLogger(__name__)
 engine = None
@@ -39,5 +40,10 @@ async def healthz():
 
 @app.post("/tts/synthesize")
 async def synthesize(text: str = Form(...), params: str = Form("{}")):
-    result = await engine.synthesize(text, json.loads(params))
-    return Response(content=result.audio, media_type=result.content_type)
+    params_dict = json.loads(params)
+    result = await engine.synthesize(text, params_dict)
+    minio_key = storage.upload_audio(result.audio, prefix="tts", call_id=params_dict.get("call_id", ""))
+    headers = {}
+    if minio_key:
+        headers["X-Minio-Key"] = minio_key
+    return Response(content=result.audio, media_type=result.content_type, headers=headers)
