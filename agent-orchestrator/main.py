@@ -6,12 +6,12 @@ from pydantic import BaseModel
 
 from fastapi import HTTPException
 
-from config import settings
-from database import engine as db_engine
-from graph.flow import create_call_graph, set_services, CallGraphState
-from memory.assembler import MemoryAssembler
-from clients.mcp import MCPClient
-from clients.tts import TTSClient
+from src.config import settings
+from src.database import engine as db_engine
+from src.graph.flow import create_call_graph, set_services, CallGraphState
+from src.memory.assembler import MemoryAssembler
+from src.clients.mcp import MCPClient
+from src.clients.tts import TTSClient
 
 logging.basicConfig(
     level=logging.INFO,

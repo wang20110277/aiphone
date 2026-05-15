@@ -16,8 +16,8 @@ cd agent-asr && PYTHONPATH=$(pwd) pytest tests/ -v
 # TTS adapter (must cd first)
 cd agent-tts && PYTHONPATH=$(pwd) pytest tests/ -v
 
-# Orchestrator (source in src/)
-cd agent-orchestrator && PYTHONPATH=$(pwd)/src pytest tests/ -v
+# Orchestrator (main.py at root, source in src/)
+cd agent-orchestrator && PYTHONPATH=$(pwd):$(pwd)/src pytest tests/ -v
 
 # Run single test file
 cd agent-asr && PYTHONPATH=$(pwd) pytest tests/engines/sensevoice/test_engine.py -v
@@ -31,8 +31,8 @@ cd agent-asr/asradapter && PYTHONPATH=$(cd .. && pwd) uvicorn main:app --host 0.
 # TTS adapter (port 8081)
 cd agent-tts/ttsadapter && PYTHONPATH=$(cd .. && pwd) uvicorn main:app --host 0.0.0.0 --port 8081
 
-# Orchestrator (source in src/)
-cd agent-orchestrator && PYTHONPATH=$(pwd)/src uvicorn main:app --host 0.0.0.0 --port 8000
+# Orchestrator (main.py at root, source in src/)
+cd agent-orchestrator && PYTHONPATH=$(pwd):$(pwd)/src uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ### DB Migrations
@@ -118,39 +118,41 @@ Full adaptive + corrective RAG inside `rag_retrieve_node`:
 
 | Module | Role |
 |--------|------|
-| `config.py` | pydantic-settings, all config via `CALLBOT_` env prefix |
-| `database.py` | SQLAlchemy 2.0 async engine + session factory |
-| `main.py` | FastAPI app with lifespan init, `POST /call/speech`, `GET /healthz` |
-| `graph/flow.py` | LangGraph 7-node StateGraph pipeline |
-| `graph/prompt.py` | System prompt + RAG + memory + chat history assembly |
-| `clients/mcp.py` | MCP user center (identity/credit query) |
-| `clients/tts.py` | TTS adapter HTTP client |
-| `llm/service.py` | LangChain ChatOpenAI with structured output + embeddings |
-| `memory/assembler.py` | Aggregates Redis hot facts + PG long-term facts |
-| `memory/chat_history.py` | langchain-redis `RedisChatMessageHistory` conversation memory |
-| `memory/redis_memory.py` | Per-user hot fact storage (Redis hash) |
-| `memory/store.py` | PG fact + vector data access |
-| `rag/retriever.py` | Agentic RAG: adaptive retrieval + document grading + query rewriting |
-| `db/models.py` | SQLAlchemy 2.0 ORM models (callbot schema, 9 tables) |
-| `storage/repository.py` | Async repository for sessions/turns/events/artifacts |
+| `main.py` | FastAPI app with lifespan init, `POST /call/speech`, `GET /healthz` (at project root) |
+| `src/config.py` | pydantic-settings, all config via `CALLBOT_` env prefix |
+| `src/database.py` | SQLAlchemy 2.0 async engine + session factory |
+| `src/graph/flow.py` | LangGraph 7-node StateGraph pipeline |
+| `src/graph/prompt.py` | System prompt + RAG + memory + chat history assembly |
+| `src/clients/mcp.py` | MCP user center (identity/credit query) |
+| `src/clients/tts.py` | TTS adapter HTTP client |
+| `src/llm/service.py` | LangChain ChatOpenAI with structured output + embeddings |
+| `src/memory/assembler.py` | Aggregates Redis hot facts + PG long-term facts |
+| `src/memory/chat_history.py` | langchain-redis `RedisChatMessageHistory` conversation memory |
+| `src/memory/redis_memory.py` | Per-user hot fact storage (Redis hash) |
+| `src/memory/store.py` | PG fact + vector data access |
+| `src/rag/retriever.py` | Agentic RAG: adaptive retrieval + document grading + query rewriting |
+| `src/db/models.py` | SQLAlchemy 2.0 ORM models (callbot schema, 9 tables) |
+| `src/storage/repository.py` | Async repository for sessions/turns/events/artifacts |
 
 ### Project Structure
 
 ```
 aiphone/
 ├── agent-asr/           # ASR adapter (FastAPI, pluggable engines)
-│   ├── asradapter/      # main.py, base.py, config.py, storage.py
+│   ├── asradapter/      # main.py, base.py, config.py
+│   │   ├── store/       # storage.py (MinIO upload)
 │   │   └── engines/     # sensevoice/, vibevoice/
 │   ├── asrengine/       # SenseVoice 推理引擎 (Dockerfile + server.py)
 │   └── tests/           # test_base, test_main, test_storage, engines/
 ├── agent-tts/           # TTS adapter (FastAPI, pluggable engines)
-│   ├── ttsadapter/      # main.py, base.py, config.py, storage.py
+│   ├── ttsadapter/      # main.py, base.py, config.py
+│   │   ├── store/       # storage.py (MinIO upload)
 │   │   └── engines/     # cosyvoice/, vibevoice/
 │   ├── ttsengine/       # CosyVoice 推理引擎 (Dockerfile + server.py)
 │   └── tests/           # test_base, test_main, test_storage, engines/
 ├── agent-orchestrator/  # LangGraph 7-node pipeline (FastAPI HTTP service)
-│   ├── src/             # 核心源码 (PYTHONPATH=src)
-│   │   ├── main.py      # FastAPI entry point
+│   ├── main.py          # FastAPI entry point
+│   ├── src/             # 核心源码 (PYTHONPATH includes src/)
 │   │   ├── config.py    # pydantic-settings
 │   │   ├── database.py  # SQLAlchemy async engine
 │   │   ├── clients/     # mcp.py, tts.py
