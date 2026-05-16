@@ -1,0 +1,26 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: mcp-server
+  ai:
+    mcp:
+      server:
+        enabled: true
+        protocol: STATELESS
+        name: user-center-mcp-server
+        version: 1.0.0
+        type: SYNC
+        instructions: "用户中心 MCP 服务器，提供身份查询和征信查询工具"
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+        stateless:
+          mcp-endpoint: /mcp
+
+logging:
+  level:
+    io.modelcontextprotocol: DEBUG

@@ -40,6 +40,15 @@ cd agent-orchestrator && PYTHONPATH=$(pwd):$(pwd)/src uvicorn main:app --host 0.
 cd agent-orchestrator && PYTHONPATH=$(pwd)/src alembic upgrade head
 ```
 
+### MCP Server (Java)
+```bash
+# Build
+cd mcp-server/java-mcp-server && JAVA_HOME=/opt/homebrew/opt/openjdk ./mvnw clean compile
+
+# Run (port 8082)
+cd mcp-server/java-mcp-server && JAVA_HOME=/opt/homebrew/opt/openjdk ./mvnw spring-boot:run
+```
+
 ## Architecture
 
 ```
@@ -49,6 +58,7 @@ SIP Caller → FreeSWITCH (mod_sofia, SIP/RTP)
     │    └─ TTS resource → HTTP POST → agent-tts adapter (:8081)
     └─ 外部调度系统 → HTTP POST /call/speech → agent-orchestrator (:8000)
          ├─ 7-node LangGraph pipeline → LLM decision → TTS via HTTP
+         ├─ Node ②/③: MCP client → java-mcp-server (:8082) 用户中心
          └─ Returns: {action, text, tts_audio, tts_minio_key}
 ```
 
@@ -65,6 +75,8 @@ Data flow per turn:
 **agent-tts** — FastAPI adapter with pluggable TTS engines. Receives text from UniMRCP/orchestrator, synthesizes audio, uploads to MinIO. Endpoints: `POST /tts/synthesize` (binary), `POST /tts/synthesize_json` (JSON with base64 audio + minio_key), `GET /healthz`.
 
 **agent-orchestrator** — FastAPI HTTP service. Receives ASR text via `POST /call/speech`, runs 7-node LangGraph pipeline, returns TTS audio. LLM via LangChain ChatOpenAI with structured output (`LLMAction`). Conversation history via langchain-redis `RedisChatMessageHistory`. Agentic RAG with adaptive retrieval + document grading + query rewriting.
+
+**java-mcp-server** — Spring Boot 3.5 + Spring AI 1.1.6 stateless MCP server (WebMVC transport). Serves as the user center backend for orchestrator nodes ② and ③. Exposes two MCP tools: `user_identity_query` (phone_hash + biz_type → identity info) and `user_credit_query` (user_id + phone_hash → credit info). Endpoint: `POST /mcp` on port 8082.
 
 ### LangGraph 7-Node Pipeline
 
@@ -113,6 +125,7 @@ Full adaptive + corrective RAG inside `rag_retrieve_node`:
 - **MinIO**: `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` (optional, disabled when empty)
 - **Engine URLs**: `SENSEVOICE_API_URL`, `COSYVOICE_API_URL`, `VIBEVOICE_ASR_API_URL`, `VIBEVOICE_TTS_API_URL`
 - **RAG**: `CALLBOT_RAG_TOP_K` (default 3), `CALLBOT_RAG_SIMILARITY_THRESHOLD` (default 0.7), `CALLBOT_RAG_MAX_RETRIES` (default 2)
+- **MCP Server**: `application.yaml` with `spring.ai.mcp.server.*` properties, STATELESS protocol, WebMVC transport, port 8082
 
 ### Key Orchestrator Modules
 
@@ -123,7 +136,7 @@ Full adaptive + corrective RAG inside `rag_retrieve_node`:
 | `src/database.py` | SQLAlchemy 2.0 async engine + session factory |
 | `src/graph/flow.py` | LangGraph 7-node StateGraph pipeline |
 | `src/graph/prompt.py` | System prompt + RAG + memory + chat history assembly |
-| `src/clients/mcp.py` | MCP user center (identity/credit query) |
+| `src/clients/mcp.py` | MCP client → java-mcp-server (identity/credit query via langchain-mcp-adapters) |
 | `src/clients/tts.py` | TTS adapter HTTP client |
 | `src/llm/service.py` | LangChain ChatOpenAI with structured output + embeddings |
 | `src/memory/assembler.py` | Aggregates Redis hot facts + PG long-term facts |
@@ -165,6 +178,14 @@ aiphone/
 │   ├── llm/             # Qwen LLM 推理引擎 Dockerfile
 │   ├── alembic/         # DB migrations
 │   └── tests/           # test suite
+├── mcp-server/              # MCP servers (user center backend)
+│   └── java-mcp-server/ # Spring Boot + Spring AI stateless MCP server
+│       ├── src/main/java/com/trans/mcp/
+│       │   ├── McpApplication.java     # Entry point + tool registration
+│       │   ├── model/                  # IdentityResult, CreditResult records
+│       │   └── service/                # UserService, CreditService (@Tool)
+│       └── src/main/resources/
+│           └── application.yaml        # MCP server config (STATELESS, /mcp endpoint)
 ├── deploy/              # systemd services, install scripts, monitoring
 ├── freeswitch/          # FreeSWITCH + UniMRCP configs
 └── docs/                # design specs, implementation plans
@@ -176,5 +197,6 @@ aiphone/
 - **Redis** for hot memory, conversation history (langchain-redis), session state
 - **MinIO** for audio archiving
 - **FreeSWITCH 1.10.12** compiled from source with mod_unimrcp
+- **Java MCP Server** Spring Boot 3.5 + Spring AI 1.1.6, Java 25, Maven build
 - **UniMRCP** compiled from source
 - **GPU allocation**: ASR=GPU0, TTS=GPU1, LLM(Qwen)=GPU2
