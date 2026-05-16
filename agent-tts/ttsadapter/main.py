@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import base64
@@ -43,8 +44,11 @@ async def healthz():
 @app.post("/tts/synthesize")
 async def synthesize(text: str = Form(...), params: str = Form("{}")):
     params_dict = json.loads(params)
+    call_id = params_dict.get("call_id", "")
     result = await engine.synthesize(text, params_dict)
-    minio_key = storage.upload_audio(result.audio, prefix="tts", call_id=params_dict.get("call_id", ""))
+    minio_key = storage.build_object_key(prefix="tts", call_id=call_id)
+    if minio_key:
+        asyncio.create_task(storage.upload_audio_async(result.audio, minio_key))
     headers = {}
     if minio_key:
         headers["X-Minio-Key"] = minio_key
@@ -54,8 +58,11 @@ async def synthesize(text: str = Form(...), params: str = Form("{}")):
 @app.post("/tts/synthesize_json")
 async def synthesize_json(text: str = Form(...), params: str = Form("{}")):
     params_dict = json.loads(params)
+    call_id = params_dict.get("call_id", "")
     result = await engine.synthesize(text, params_dict)
-    minio_key = storage.upload_audio(result.audio, prefix="tts", call_id=params_dict.get("call_id", ""))
+    minio_key = storage.build_object_key(prefix="tts", call_id=call_id)
+    if minio_key:
+        asyncio.create_task(storage.upload_audio_async(result.audio, minio_key))
     audio_b64 = base64.b64encode(result.audio).decode("ascii") if result.audio else ""
     resp = {
         "audio": audio_b64,

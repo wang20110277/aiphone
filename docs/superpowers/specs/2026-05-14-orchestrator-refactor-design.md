@@ -2,7 +2,7 @@
 
 ## Overview
 
-Refactor agent-orchestrator from an ESL-event-driven architecture to an HTTP service with a clean 7-node LangGraph pipeline. The orchestrator no longer connects directly to FreeSWITCH — it receives ASR results via HTTP and calls TTS adapter via HTTP.
+Refactor agent-flow from an ESL-event-driven architecture to an HTTP service with a clean 7-node LangGraph pipeline. The orchestrator no longer connects directly to FreeSWITCH — it receives ASR results via HTTP and calls TTS adapter via HTTP.
 
 ## Architecture Change
 

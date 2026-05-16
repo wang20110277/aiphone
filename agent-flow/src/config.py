@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # LLM
     llm_engine: str = "qwen"
-    llm_base_url: str = "http://127.0.0.1:8080/v1"
+    llm_base_url: str = "http://127.0.0.1:8083/v1"
     llm_model: str = "qwen3.5-9b"
     llm_embedding_model: str = "text-embedding-v3"
 

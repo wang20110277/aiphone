@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import yaml
@@ -53,9 +54,11 @@ async def healthz():
 async def recognize(audio: UploadFile, params: str = Form("{}")):
     audio_bytes = await audio.read()
     params_dict = json.loads(params)
-    minio_key = storage.upload_audio(audio_bytes, prefix="asr", call_id=params_dict.get("call_id", ""))
-    result = await engine.recognize(audio_bytes, params_dict)
     call_id = params_dict.get("call_id", "")
+    minio_key = storage.build_object_key(prefix="asr", call_id=call_id)
+    result = await engine.recognize(audio_bytes, params_dict)
+    if minio_key:
+        asyncio.create_task(storage.upload_audio_async(audio_bytes, minio_key))
     _save_audio_meta(call_id, minio_key, result.text)
     resp = {"text": result.text, "confidence": result.confidence, "is_final": result.is_final}
     if minio_key:

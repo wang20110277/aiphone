@@ -1247,15 +1247,15 @@ git commit -m "feat: add systemd service files for ASR and TTS adapters"
 ### Task 11: 项目初始化与统一配置
 
 **Files:**
-- Create: `agent-orchestrator/config.py`
-- Create: `agent-orchestrator/requirements.txt`
-- Create: `agent-orchestrator/tests/__init__.py`
-- Test: `agent-orchestrator/tests/test_config.py`
+- Create: `agent-flow/config.py`
+- Create: `agent-flow/requirements.txt`
+- Create: `agent-flow/tests/__init__.py`
+- Test: `agent-flow/tests/test_config.py`
 
 - [ ] **Step 1: 编写配置测试**
 
 ```python
-# agent-orchestrator/tests/test_config.py
+# agent-flow/tests/test_config.py
 from config import Settings
 
 
@@ -1270,13 +1270,13 @@ def test_default_settings():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_config.py -v
+cd agent-flow && python -m pytest tests/test_config.py -v
 ```
 
 - [ ] **Step 3: 实现配置模块**
 
 ```python
-# agent-orchestrator/config.py
+# agent-flow/config.py
 import os
 from dataclasses import dataclass, field
 
@@ -1321,7 +1321,7 @@ settings = Settings()
 ```
 
 ```txt
-# agent-orchestrator/requirements.txt
+# agent-flow/requirements.txt
 fastapi>=0.110
 uvicorn>=0.29
 python-ESL>=0.1
@@ -1340,13 +1340,13 @@ pytest-asyncio>=0.23
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_config.py -v
+cd agent-flow && python -m pytest tests/test_config.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/config.py agent-orchestrator/requirements.txt agent-orchestrator/tests/
+git add agent-flow/config.py agent-flow/requirements.txt agent-flow/tests/
 git commit -m "feat(orchestrator): add unified config module with env overrides"
 ```
 
@@ -1355,13 +1355,13 @@ git commit -m "feat(orchestrator): add unified config module with env overrides"
 ### Task 12: 通话状态管理
 
 **Files:**
-- Create: `agent-orchestrator/call_state.py`
-- Test: `agent-orchestrator/tests/test_call_state.py`
+- Create: `agent-flow/call_state.py`
+- Test: `agent-flow/tests/test_call_state.py`
 
 - [ ] **Step 1: 编写状态管理测试**
 
 ```python
-# agent-orchestrator/tests/test_call_state.py
+# agent-flow/tests/test_call_state.py
 import pytest
 from call_state import CallState, CallStateManager
 
@@ -1398,13 +1398,13 @@ def test_manager_list():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_call_state.py -v
+cd agent-flow && python -m pytest tests/test_call_state.py -v
 ```
 
 - [ ] **Step 3: 实现 CallState**
 
 ```python
-# agent-orchestrator/call_state.py
+# agent-flow/call_state.py
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -1453,13 +1453,13 @@ class CallStateManager:
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_call_state.py -v
+cd agent-flow && python -m pytest tests/test_call_state.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/call_state.py agent-orchestrator/tests/test_call_state.py
+git add agent-flow/call_state.py agent-flow/tests/test_call_state.py
 git commit -m "feat(orchestrator): add CallState dataclass and in-memory state manager"
 ```
 
@@ -1468,13 +1468,13 @@ git commit -m "feat(orchestrator): add CallState dataclass and in-memory state m
 ### Task 13: FS 动作封装
 
 **Files:**
-- Create: `agent-orchestrator/fs_actions.py`
-- Test: `agent-orchestrator/tests/test_fs_actions.py`
+- Create: `agent-flow/fs_actions.py`
+- Test: `agent-flow/tests/test_fs_actions.py`
 
 - [ ] **Step 1: 编写动作封装测试**
 
 ```python
-# agent-orchestrator/tests/test_fs_actions.py
+# agent-flow/tests/test_fs_actions.py
 import pytest
 from unittest.mock import MagicMock
 from fs_actions import FSActions, TTSProfileMap
@@ -1502,13 +1502,13 @@ def test_play_legal_notice_calls_api():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_fs_actions.py -v
+cd agent-flow && python -m pytest tests/test_fs_actions.py -v
 ```
 
 - [ ] **Step 3: 实现 FSActions**
 
 ```python
-# agent-orchestrator/fs_actions.py
+# agent-flow/fs_actions.py
 import logging
 from config import settings
 
@@ -1571,13 +1571,13 @@ class FSActions:
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_fs_actions.py -v
+cd agent-flow && python -m pytest tests/test_fs_actions.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/fs_actions.py agent-orchestrator/tests/test_fs_actions.py
+git add agent-flow/fs_actions.py agent-flow/tests/test_fs_actions.py
 git commit -m "feat(orchestrator): add FSActions wrapper for ESL commands"
 ```
 
@@ -1586,16 +1586,16 @@ git commit -m "feat(orchestrator): add FSActions wrapper for ESL commands"
 ### Task 14: 事件处理器
 
 **Files:**
-- Create: `agent-orchestrator/event_handlers.py`
-- Create: `agent-orchestrator/prompts/customer_service.yaml`
-- Create: `agent-orchestrator/prompts/collection.yaml`
-- Create: `agent-orchestrator/prompts/marketing.yaml`
-- Test: `agent-orchestrator/tests/test_event_handlers.py`
+- Create: `agent-flow/event_handlers.py`
+- Create: `agent-flow/prompts/customer_service.yaml`
+- Create: `agent-flow/prompts/collection.yaml`
+- Create: `agent-flow/prompts/marketing.yaml`
+- Test: `agent-flow/tests/test_event_handlers.py`
 
 - [ ] **Step 1: 编写事件处理测试**
 
 ```python
-# agent-orchestrator/tests/test_event_handlers.py
+# agent-flow/tests/test_event_handlers.py
 import pytest
 from unittest.mock import MagicMock, patch
 from event_handlers import EventDispatcher
@@ -1628,13 +1628,13 @@ def test_handle_channel_hangup_cleans_state(dispatcher):
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_event_handlers.py -v
+cd agent-flow && python -m pytest tests/test_event_handlers.py -v
 ```
 
 - [ ] **Step 3: 实现事件处理器**
 
 ```python
-# agent-orchestrator/event_handlers.py
+# agent-flow/event_handlers.py
 import time
 import json
 import logging
@@ -1777,7 +1777,7 @@ class EventDispatcher:
 - [ ] **Step 4: 创建 Prompt 模板**
 
 ```yaml
-# agent-orchestrator/prompts/customer_service.yaml
+# agent-flow/prompts/customer_service.yaml
 system: |
   你是一名客服AI助手。语气温柔、专业、有耐心。
   回答用户问题，必要时转接人工。
@@ -1789,7 +1789,7 @@ max_reply_length: 200
 ```
 
 ```yaml
-# agent-orchestrator/prompts/collection.yaml
+# agent-flow/prompts/collection.yaml
 system: |
   你是一名催收专员AI助手。语气专业、不威胁。
   严格规则：仅在身份核验通过后才能提及具体欠款金额。
@@ -1802,7 +1802,7 @@ max_reply_length: 50
 ```
 
 ```yaml
-# agent-orchestrator/prompts/marketing.yaml
+# agent-flow/prompts/marketing.yaml
 system: |
   你是一名营销AI助手。语气热情、活力、有感染力。
   介绍产品优势，引导用户兴趣。每次回复不超过80字。
@@ -1816,13 +1816,13 @@ max_reply_length: 80
 - [ ] **Step 5: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_event_handlers.py -v
+cd agent-flow && python -m pytest tests/test_event_handlers.py -v
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agent-orchestrator/event_handlers.py agent-orchestrator/prompts/ agent-orchestrator/tests/test_event_handlers.py
+git add agent-flow/event_handlers.py agent-flow/prompts/ agent-flow/tests/test_event_handlers.py
 git commit -m "feat(orchestrator): add event dispatcher with rule-engine fallback"
 ```
 
@@ -1831,13 +1831,13 @@ git commit -m "feat(orchestrator): add event dispatcher with rule-engine fallbac
 ### Task 15: ESL 连接管理与主入口
 
 **Files:**
-- Create: `agent-orchestrator/fs_esl.py`
-- Create: `agent-orchestrator/main.py`
+- Create: `agent-flow/fs_esl.py`
+- Create: `agent-flow/main.py`
 
 - [ ] **Step 1: 实现 ESL 连接管理**
 
 ```python
-# agent-orchestrator/fs_esl.py
+# agent-flow/fs_esl.py
 import time
 import json
 import logging
@@ -1902,7 +1902,7 @@ class ESLEventLoop:
 - [ ] **Step 2: 实现主入口**
 
 ```python
-# agent-orchestrator/main.py
+# agent-flow/main.py
 import logging
 from fs_esl import ESLEventLoop
 from event_handlers import EventDispatcher
@@ -1943,7 +1943,7 @@ if __name__ == "__main__":
 - [ ] **Step 3: Commit**
 
 ```bash
-git add agent-orchestrator/fs_esl.py agent-orchestrator/main.py
+git add agent-flow/fs_esl.py agent-flow/main.py
 git commit -m "feat(orchestrator): add ESL event loop and main entry point"
 ```
 
@@ -1954,16 +1954,16 @@ git commit -m "feat(orchestrator): add ESL event loop and main entry point"
 ### Task 16: LLM 抽象接口与 Qwen 引擎
 
 **Files:**
-- Create: `agent-orchestrator/llm_base.py`
-- Create: `agent-orchestrator/llm_engines/__init__.py`
-- Create: `agent-orchestrator/llm_engines/qwen/__init__.py`
-- Create: `agent-orchestrator/llm_engines/qwen/engine.py`
-- Test: `agent-orchestrator/tests/test_llm_base.py`
+- Create: `agent-flow/llm_base.py`
+- Create: `agent-flow/llm_engines/__init__.py`
+- Create: `agent-flow/llm_engines/qwen/__init__.py`
+- Create: `agent-flow/llm_engines/qwen/engine.py`
+- Test: `agent-flow/tests/test_llm_base.py`
 
 - [ ] **Step 1: 编写 LLM 接口测试**
 
 ```python
-# agent-orchestrator/tests/test_llm_base.py
+# agent-flow/tests/test_llm_base.py
 import pytest
 from llm_base import LLMEngine, LLMAction
 
@@ -1996,13 +1996,13 @@ def test_parse_llm_response_invalid_json_fallback():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_llm_base.py -v
+cd agent-flow && python -m pytest tests/test_llm_base.py -v
 ```
 
 - [ ] **Step 3: 实现 LLM 基础模块**
 
 ```python
-# agent-orchestrator/llm_base.py
+# agent-flow/llm_base.py
 import re
 import json
 import logging
@@ -2083,7 +2083,7 @@ def parse_llm_response(raw: str) -> LLMAction:
 - [ ] **Step 4: 实现 Qwen 引擎**
 
 ```python
-# agent-orchestrator/llm_engines/qwen/engine.py
+# agent-flow/llm_engines/qwen/engine.py
 import logging
 import httpx
 from llm_base import LLMEngine
@@ -2129,23 +2129,23 @@ class QwenEngine(LLMEngine):
 ```
 
 ```python
-# agent-orchestrator/llm_engines/qwen/__init__.py
+# agent-flow/llm_engines/qwen/__init__.py
 ```
 
 ```python
-# agent-orchestrator/llm_engines/__init__.py
+# agent-flow/llm_engines/__init__.py
 ```
 
 - [ ] **Step 5: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_llm_base.py -v
+cd agent-flow && python -m pytest tests/test_llm_base.py -v
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add agent-orchestrator/llm_base.py agent-orchestrator/llm_engines/ agent-orchestrator/tests/test_llm_base.py
+git add agent-flow/llm_base.py agent-flow/llm_engines/ agent-flow/tests/test_llm_base.py
 git commit -m "feat(orchestrator): add pluggable LLM engine with Qwen implementation"
 ```
 
@@ -2154,13 +2154,13 @@ git commit -m "feat(orchestrator): add pluggable LLM engine with Qwen implementa
 ### Task 17: Prompt 上下文组装
 
 **Files:**
-- Create: `agent-orchestrator/prompt_builder.py`
-- Test: `agent-orchestrator/tests/test_prompt_builder.py`
+- Create: `agent-flow/prompt_builder.py`
+- Test: `agent-flow/tests/test_prompt_builder.py`
 
 - [ ] **Step 1: 编写上下文组装测试**
 
 ```python
-# agent-orchestrator/tests/test_prompt_builder.py
+# agent-flow/tests/test_prompt_builder.py
 from prompt_builder import build_prompt
 
 
@@ -2221,13 +2221,13 @@ def test_build_prompt_with_history():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_prompt_builder.py -v
+cd agent-flow && python -m pytest tests/test_prompt_builder.py -v
 ```
 
 - [ ] **Step 3: 实现上下文组装**
 
 ```python
-# agent-orchestrator/prompt_builder.py
+# agent-flow/prompt_builder.py
 def build_prompt(
     biz_type: str,
     system_prompt: str,
@@ -2262,13 +2262,13 @@ def build_prompt(
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_prompt_builder.py -v
+cd agent-flow && python -m pytest tests/test_prompt_builder.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/prompt_builder.py agent-orchestrator/tests/test_prompt_builder.py
+git add agent-flow/prompt_builder.py agent-flow/tests/test_prompt_builder.py
 git commit -m "feat(orchestrator): add prompt context assembler"
 ```
 
@@ -2277,13 +2277,13 @@ git commit -m "feat(orchestrator): add prompt context assembler"
 ### Task 17.5: Agentic RAG 话术检索服务
 
 **Files:**
-- Create: `agent-orchestrator/rag_retriever.py`
-- Test: `agent-orchestrator/tests/test_rag_retriever.py`
+- Create: `agent-flow/rag_retriever.py`
+- Test: `agent-flow/tests/test_rag_retriever.py`
 
 - [ ] **Step 1: 编写 RAG 检索测试**
 
 ```python
-# agent-orchestrator/tests/test_rag_retriever.py
+# agent-flow/tests/test_rag_retriever.py
 import pytest
 from rag_retriever import retrieve_scripts, build_rag_block
 
@@ -2322,13 +2322,13 @@ def test_build_rag_block_with_scripts():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_rag_retriever.py -v
+cd agent-flow && python -m pytest tests/test_rag_retriever.py -v
 ```
 
 - [ ] **Step 3: 实现 RAG 检索服务**
 
 ```python
-# agent-orchestrator/rag_retriever.py
+# agent-flow/rag_retriever.py
 import logging
 import asyncio
 import asyncpg
@@ -2403,13 +2403,13 @@ def build_rag_block(scripts: list[dict]) -> str:
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_rag_retriever.py -v
+cd agent-flow && python -m pytest tests/test_rag_retriever.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/rag_retriever.py agent-orchestrator/tests/test_rag_retriever.py
+git add agent-flow/rag_retriever.py agent-flow/tests/test_rag_retriever.py
 git commit -m "feat(orchestrator): add Agentic RAG script retrieval service"
 ```
 
@@ -2420,13 +2420,13 @@ git commit -m "feat(orchestrator): add Agentic RAG script retrieval service"
 ### Task 18: LangGraph 状态图
 
 **Files:**
-- Create: `agent-orchestrator/graph_flow.py`
-- Test: `agent-orchestrator/tests/test_graph_flow.py`
+- Create: `agent-flow/graph_flow.py`
+- Test: `agent-flow/tests/test_graph_flow.py`
 
 - [ ] **Step 1: 编写 LangGraph 流程测试**
 
 ```python
-# agent-orchestrator/tests/test_graph_flow.py
+# agent-flow/tests/test_graph_flow.py
 import pytest
 from graph_flow import create_call_graph, CallGraphState
 
@@ -2459,13 +2459,13 @@ async def test_graph_runs_recall_to_execute():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_graph_flow.py -v
+cd agent-flow && python -m pytest tests/test_graph_flow.py -v
 ```
 
 - [ ] **Step 3: 实现 LangGraph 状态图**
 
 ```python
-# agent-orchestrator/graph_flow.py
+# agent-flow/graph_flow.py
 import logging
 from typing import TypedDict, Optional
 from langgraph.graph import StateGraph, END
@@ -2584,13 +2584,13 @@ def create_call_graph():
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_graph_flow.py -v
+cd agent-flow && python -m pytest tests/test_graph_flow.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/graph_flow.py agent-orchestrator/tests/test_graph_flow.py
+git add agent-flow/graph_flow.py agent-flow/tests/test_graph_flow.py
 git commit -m "feat(orchestrator): add LangGraph state graph with compliance routing"
 ```
 
@@ -2599,7 +2599,7 @@ git commit -m "feat(orchestrator): add LangGraph state graph with compliance rou
 ### Task 19: 集成 LangGraph 到事件处理器
 
 **Files:**
-- Modify: `agent-orchestrator/event_handlers.py`
+- Modify: `agent-flow/event_handlers.py`
 
 - [ ] **Step 1: 更新 DETECTED_SPEECH handler 使用 LangGraph**
 
@@ -2640,13 +2640,13 @@ git commit -m "feat(orchestrator): add LangGraph state graph with compliance rou
 - [ ] **Step 2: 运行全部测试**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/ -v
+cd agent-flow && python -m pytest tests/ -v
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add agent-orchestrator/event_handlers.py
+git add agent-flow/event_handlers.py
 git commit -m "feat(orchestrator): integrate LangGraph into DETECTED_SPEECH handler"
 ```
 
@@ -2657,15 +2657,15 @@ git commit -m "feat(orchestrator): integrate LangGraph into DETECTED_SPEECH hand
 ### Task 20: Redis Hot Memory
 
 **Files:**
-- Create: `agent-orchestrator/memory/redis_memory.py`
-- Create: `agent-orchestrator/memory/__init__.py`
-- Test: `agent-orchestrator/tests/memory/__init__.py`
-- Test: `agent-orchestrator/tests/memory/test_redis_memory.py`
+- Create: `agent-flow/memory/redis_memory.py`
+- Create: `agent-flow/memory/__init__.py`
+- Test: `agent-flow/tests/memory/__init__.py`
+- Test: `agent-flow/tests/memory/test_redis_memory.py`
 
 - [ ] **Step 1: 编写 Redis memory 测试**
 
 ```python
-# agent-orchestrator/tests/memory/test_redis_memory.py
+# agent-flow/tests/memory/test_redis_memory.py
 import pytest
 from unittest.mock import MagicMock, patch
 from memory.redis_memory import RedisHotMemory
@@ -2697,13 +2697,13 @@ def test_set_do_not_call(memory):
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/memory/test_redis_memory.py -v
+cd agent-flow && python -m pytest tests/memory/test_redis_memory.py -v
 ```
 
 - [ ] **Step 3: 实现 Redis Hot Memory**
 
 ```python
-# agent-orchestrator/memory/redis_memory.py
+# agent-flow/memory/redis_memory.py
 import redis
 from datetime import datetime
 
@@ -2739,13 +2739,13 @@ class RedisHotMemory:
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/memory/test_redis_memory.py -v
+cd agent-flow && python -m pytest tests/memory/test_redis_memory.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/memory/ agent-orchestrator/tests/memory/
+git add agent-flow/memory/ agent-flow/tests/memory/
 git commit -m "feat(orchestrator): add Redis hot memory module"
 ```
 
@@ -2754,16 +2754,16 @@ git commit -m "feat(orchestrator): add Redis hot memory module"
 ### Task 21: PG Facts + PG Vector + Assembler
 
 **Files:**
-- Create: `agent-orchestrator/memory/pg_facts.py`
-- Create: `agent-orchestrator/memory/pg_vector.py`
-- Create: `agent-orchestrator/memory/assembler.py`
-- Create: `agent-orchestrator/storage/db_pg.py`
-- Test: `agent-orchestrator/tests/memory/test_assembler.py`
+- Create: `agent-flow/memory/pg_facts.py`
+- Create: `agent-flow/memory/pg_vector.py`
+- Create: `agent-flow/memory/assembler.py`
+- Create: `agent-flow/storage/db_pg.py`
+- Test: `agent-flow/tests/memory/test_assembler.py`
 
 - [ ] **Step 1: 实现 PG 存储层**
 
 ```python
-# agent-orchestrator/storage/db_pg.py
+# agent-flow/storage/db_pg.py
 import psycopg
 from config import settings
 
@@ -2808,7 +2808,7 @@ async def insert_turn(call_id: str, fs_uuid: str, biz_type: str, user_key: str, 
 - [ ] **Step 2: 实现 PG Facts**
 
 ```python
-# agent-orchestrator/memory/pg_facts.py
+# agent-flow/memory/pg_facts.py
 import psycopg
 from config import settings
 
@@ -2845,7 +2845,7 @@ async def upsert_fact(biz_type: str, user_key: str, fact_type: str, fact_value: 
 - [ ] **Step 3: 实现 PG Vector**
 
 ```python
-# agent-orchestrator/memory/pg_vector.py
+# agent-flow/memory/pg_vector.py
 import psycopg
 from config import settings
 
@@ -2881,7 +2881,7 @@ async def insert_vector(biz_type: str, user_key: str, content: str, embedding: l
 - [ ] **Step 4: 实现 Memory Block 组装器**
 
 ```python
-# agent-orchestrator/memory/assembler.py
+# agent-flow/memory/assembler.py
 import logging
 from memory.redis_memory import RedisHotMemory
 from memory.pg_facts import get_recent_facts
@@ -2919,7 +2919,7 @@ class MemoryAssembler:
 - [ ] **Step 5: 编写 assembler 测试**
 
 ```python
-# agent-orchestrator/tests/memory/test_assembler.py
+# agent-flow/tests/memory/test_assembler.py
 import pytest
 from unittest.mock import patch, MagicMock
 from memory.assembler import MemoryAssembler
@@ -2942,13 +2942,13 @@ async def test_assemble_returns_string():
 - [ ] **Step 6: 运行测试**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/memory/ -v
+cd agent-flow && python -m pytest tests/memory/ -v
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add agent-orchestrator/memory/ agent-orchestrator/storage/ agent-orchestrator/tests/memory/
+git add agent-flow/memory/ agent-flow/storage/ agent-flow/tests/memory/
 git commit -m "feat(orchestrator): add three-layer memory system with assembler"
 ```
 
@@ -2959,13 +2959,13 @@ git commit -m "feat(orchestrator): add three-layer memory system with assembler"
 ### Task 22: MCP Client
 
 **Files:**
-- Create: `agent-orchestrator/mcp_client.py`
-- Test: `agent-orchestrator/tests/test_mcp_client.py`
+- Create: `agent-flow/mcp_client.py`
+- Test: `agent-flow/tests/test_mcp_client.py`
 
 - [ ] **Step 1: 编写 MCP client 测试**
 
 ```python
-# agent-orchestrator/tests/test_mcp_client.py
+# agent-flow/tests/test_mcp_client.py
 import pytest
 from unittest.mock import AsyncMock, patch
 from mcp_client import MCPClient, IdentityResult, CreditResult
@@ -2990,13 +2990,13 @@ async def test_query_user_identity_success():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_mcp_client.py -v
+cd agent-flow && python -m pytest tests/test_mcp_client.py -v
 ```
 
 - [ ] **Step 3: 实现 MCP Client**
 
 ```python
-# agent-orchestrator/mcp_client.py
+# agent-flow/mcp_client.py
 import logging
 import httpx
 from dataclasses import dataclass
@@ -3061,13 +3061,13 @@ class MCPClient:
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_mcp_client.py -v
+cd agent-flow && python -m pytest tests/test_mcp_client.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/mcp_client.py agent-orchestrator/tests/test_mcp_client.py
+git add agent-flow/mcp_client.py agent-flow/tests/test_mcp_client.py
 git commit -m "feat(orchestrator): add MCP client for identity and credit verification"
 ```
 
@@ -3076,13 +3076,13 @@ git commit -m "feat(orchestrator): add MCP client for identity and credit verifi
 ### Task 23: 合规门禁模块
 
 **Files:**
-- Create: `agent-orchestrator/compliance.py`
-- Test: `agent-orchestrator/tests/test_compliance.py`
+- Create: `agent-flow/compliance.py`
+- Test: `agent-flow/tests/test_compliance.py`
 
 - [ ] **Step 1: 编写合规测试**
 
 ```python
-# agent-orchestrator/tests/test_compliance.py
+# agent-flow/tests/test_compliance.py
 import pytest
 from compliance import compliance_check, contains_sensitive_fields
 from llm_base import LLMAction
@@ -3114,13 +3114,13 @@ def test_marketing_do_not_call():
 - [ ] **Step 2: 运行测试确认失败**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_compliance.py -v
+cd agent-flow && python -m pytest tests/test_compliance.py -v
 ```
 
 - [ ] **Step 3: 实现合规模块**
 
 ```python
-# agent-orchestrator/compliance.py
+# agent-flow/compliance.py
 import re
 import logging
 from llm_base import LLMAction
@@ -3169,13 +3169,13 @@ def compliance_check(
 - [ ] **Step 4: 运行测试确认通过**
 
 ```bash
-cd agent-orchestrator && python -m pytest tests/test_compliance.py -v
+cd agent-flow && python -m pytest tests/test_compliance.py -v
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add agent-orchestrator/compliance.py agent-orchestrator/tests/test_compliance.py
+git add agent-flow/compliance.py agent-flow/tests/test_compliance.py
 git commit -m "feat(orchestrator): add compliance gate for sensitive fields and do_not_call"
 ```
 
@@ -3200,8 +3200,8 @@ After=network.target freeswitch.service redis.service postgresql.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/agent-orchestrator
-ExecStart=/opt/agent-orchestrator/venv/bin/python main.py
+WorkingDirectory=/opt/agent-flow
+ExecStart=/opt/agent-flow/venv/bin/python main.py
 Restart=always
 RestartSec=5
 LimitNOFILE=1000000

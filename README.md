@@ -4,26 +4,25 @@
 1. **接入层**：SIP User发起外呼通话，通话媒体流、通话唯一标识CallID、主叫/被叫用户手机号同步上行传输
 2. **语音交换层**：通话接入FreeSWITCH软交换，负责媒体流转发、通话事件调度、上下行语音流中转，全程携带CallID+手机号
 3. **语音识别层**：FreeSWITCH基于UniMRCP协议对接MRCP ASR语音识别引擎，通过事件通知机制传输实时用户语音流，ASR引擎完成语音转文字，生成**同时携带CallID与用户手机号**的ASR识别文本
-4. **编排接入层**：**ASR识别文本携带CallID+用户手机号，以HTTP JSON接口推送至LangGraph流程编排调度器**，文本、CallID、手机号统一存入LangGraph全局状态State中持久留存，不丢失原始用户对话与身份标识数据
+4. **编排接入层**：UniMRCP Server将ASR识别文本通过HTTP JSON接口推送至LangGraph流程编排调度器，**文本、CallID、手机号统一存入LangGraph全局状态State中持久留存**，不丢失原始用户对话与身份标识数据，整个过程对客户无感
 5. **LangGraph第一业务节点（用户身份核验）**
 编排引擎内置MCP Client，通过HTTP Streamable传输协议调用java-mcp-server用户中心MCP服务，**传入用户手机号**调用`user_identity_query`工具；查询获取用户ID、脱敏手机号、身份证后四位，流程全程保留State内ASR文本、CallID、手机号
 6. **LangGraph第二业务节点（征信合规核验）**
 复用MCP Client调用java-mcp-server，**使用用户ID**调用`user_credit_query`工具，获取用户征信档案数据，校验征信资质与风险等级（仅marketing业务类型触发），征信不合规直接触发风控预警，以上两个业务节点执行全程保留LangGraph状态内的ASR原始文本、CallID、手机号
-7. **LangGraph第三业务节点（ASR文本送入LLM智能应答生成）**
-**从LangGraph全局State中提取完整ASR用户识别文本、CallID、用户手机号、用户ID**，统一送入LLM大模型；LLM解析用户语音文本语义，结合用户手机号绑定的历史用户数据，自主判定是否调取RAG知识库匹配业务标准话术，最终生成标准化外呼应答话术文本；依托LangChain Memory记忆体系做分层数据存储：Redis存储短期会话记忆、PostgreSQL(PG)存储长期业务会话数据、Mem0存储永久全域对话记忆，同步记录实时对话内容、语音文件存储路径、绑定手机号与CallID关联关系，支持客户二次呼入时通过**用户ID/手机号/CallID**双维度调取全量历史会话数据，结合历史对话信息生成连贯应答话术
-8. **语音合成下发层**：LangGraph将LLM生成的应答话术文本，附带CallID与手机号标识，通过HTTP JSON请求推送至TTS语音合成服务，完成文字转语音音频生成，将用户原始识别语音、合成应答语音统一归档存储至NAS私有存储或OSS对象存储，音频文件关联绑定CallID+手机号
+7. **LangGraph第三业务节点（LLM智能应答 + TTS语音合成）**
+**从LangGraph全局State中提取完整ASR用户识别文本、CallID、用户手机号、用户ID**，统一送入LLM大模型；LLM解析用户语音文本语义，结合用户手机号绑定的历史用户数据，自主判定是否调取RAG知识库匹配业务标准话术，最终生成标准化外呼应答话术文本；编排器调用agent-tts将话术文本合成语音音频，归档至MinIO；依托LangChain Memory记忆体系做分层数据存储：Redis存储短期会话记忆、PostgreSQL(PG)存储长期业务会话数据、Mem0存储永久全域对话记忆，同步记录实时对话内容、语音文件存储路径、绑定手机号与CallID关联关系，支持客户二次呼入时通过**用户ID/手机号/CallID**双维度调取全量历史会话数据，结合历史对话信息生成连贯应答话术
+8. **终端播放层**：UniMRCP将合成语音流回调至FreeSWITCH，FreeSWITCH下行推送至SIP User通话终端，完成整通智能外呼语音交互闭环。整个ASR识别→编排决策→TTS合成的处理链路对客户完全无感
 9. **引擎联动通知层**：TTS语音合成完成后，主动发送事件通知至MRCP TTS引擎，由MRCP TTS引擎回调通知FreeSWITCH软交换服务器，回调信息携带对应CallID与用户手机号
-10. **终端播放层**：FreeSWITCH接收播放指令，下行推送合成语音流至SIP User通话终端，完成整通智能外呼语音交互闭环
 
 ## 统一绘图强制规范
 1. 整体布局：数据流从左至右分层排布，层级从上至下划分清晰
 2. 明确标注所有协议：SIP、UniMRCP、HTTP JSON、MCP
-3. 重点高亮：**ASR文本+CallID+手机号联合HTTP JSON入LangGraph→存入State→节点三取出直传LLM**完整数据流向
+3. 重点高亮：**UniMRCP 串联 ASR→orchestrator→TTS 完整链路，对客户无感**
 4. 区分交互模式：事件通知回调、HTTP接口推送、远程服务调用、状态内存取
 5. 清晰标注三大风控预警点、三层记忆存储介质、音文件存储介质NAS/OSS
 6. **强制标注：CallID、用户手机号双标识全链路全局透传**，业务查询优先依托手机号作为核心查询维度
 7. 拆分独立模块：通信接入模块、MRCP语音识别模块、LangGraph编排模块、MCP用户中心模块、LLM+RAG智能话术模块、多级记忆存储模块、MRCP语音合成播放模块
-8. 标注身份查询逻辑：业务服务查询优先使用手机号哈希，再关联用户ID完成全维度信息匹配
+8. 标注身份查询逻辑：手机号查用户中心获取用户ID和身份证，再用用户ID查征信
 
 ---
 
@@ -51,7 +50,7 @@ aiphone/
 │   ├── deploy/             # 部署配置
 │   ├── Dockerfile          # 适配器镜像
 │   └── tests/              # test_base, test_main, test_storage, engines/*/
-├── agent-orchestrator/     # LangGraph 7 节点编排 (FastAPI HTTP 服务)
+├── agent-flow/     # LangGraph 7 节点编排 (FastAPI HTTP 服务)
 │   ├── src/                # 核心源码 (PYTHONPATH=src)
 │   │   ├── main.py         # FastAPI 入口: POST /call/speech, GET /healthz
 │   │   ├── config.py       # pydantic-settings, CALLBOT_ 环境变量前缀
@@ -112,10 +111,11 @@ aiphone/
   - ASR Resource → agent-asr adapter(:8080) → SenseVoice/VibeVoice ASR 引擎（GPU0）
   - TTS Resource → agent-tts adapter(:8081) → CosyVoice/VibeVoice TTS 引擎（GPU1）  
 
-**控制流（ESL 事件驱动编排）**  
-- Orchestrator（Python，LangGraph） ⇄ FreeSWITCH（`mod_event_socket` / ESL）  
-  - 订阅事件：CHANNEL_CREATE / CHANNEL_ANSWER / CHANNEL_HANGUP(_COMPLETE) / DETECTED_SPEECH / PLAYBACK_* / RECORD_*  
-  - 下发控制：播放固定录音告知、启动录音、启停 detect_speech、触发 TTS 播放、转人工等  
+**控制流（UniMRCP 统一调度）**
+- UniMRCP Server 串联 ASR → Orchestrator → TTS 完整链路（对客户无感）
+  - ASR 识别结果自动转发至 agent-flow
+  - orchestrator 决策结果自动调用 agent-tts 合成
+  - TTS 音频通过 UniMRCP → FreeSWITCH 播放  
 
 **决策流（本地LLM）**  
 - Orchestrator → Qwen3.5-9B 推理服务（GPU2，独立部署）  
@@ -170,7 +170,7 @@ aiphone/
 - modelscope download --model microsoft/VibeVoice-Realtime-0.5B
 - Qwen3.5-9B（GPU2）：GPU×1、CPU 32C、内存 128GB
 - modelscope download --model Qwen/Qwen3.5-9B
-- 推理引擎: `agent-orchestrator/llm/Dockerfile`
+- 推理引擎: `agent-flow/llm/Dockerfile`
 
 ### 2.4 数据与存储
 - PostgreSQL 17：CPU 16–32C、内存 128GB、NVMe（高 IOPS）
@@ -298,51 +298,37 @@ aiphone/
 
 ## 7. Python AI对话完整源码(对接Qwen3.5-9B+ASR+TTS) [1]
 
-你要交给 Codex “完整落地”，这里给**可直接生成代码的实现规范**（模块、函数、状态机、ESL事件处理、DB/Redis/记忆写入、错误处理都明确）。Codex 只需按此规范补齐具体库调用与配置文件即可。
+这里给**可直接生成代码的实现规范**（模块、函数、状态机、DB/Redis/记忆写入、错误处理都明确）。
 
 ### 7.1 工程约束
 - Python 3.12
-- `python-ESL` 连接 FS
 - `langchain-mcp-adapters` MCP Client 对接 java-mcp-server 用户中心
 - LangChain + LangGraph：图编排
 - Redis + PG17(pgvector) + mem0：记忆
+- ASR/TTS 为可插拔引擎，通过 UniMRCP Server 统一调度（对客户无感）
 
-### 7.2 必备模块与职责（codex照此建文件）
-- `fs_esl.py`：ESL连接、订阅、事件分发、断线重连
-- `fs_actions.py`：
-  - `play_legal_notice(uuid, file)`
-  - `start_recording(uuid, base_path)`
-  - `start_detect_speech(uuid, asr_profile, params)`
-  - `stop_detect_speech(uuid)`
-  - `tts_speak(uuid, tts_profile, text)`
-  - `transfer(uuid, dest)`
-- `graph_flow.py`：LangGraph StateGraph（强流程）
-- `llm_qwen.py`：Qwen3.5-9B调用 + JSON schema 校验 + 超时重试 + 降级
-- `mq_identity.py`：MCP Client 调用 java-mcp-server（身份查询 + 征信查询）
-- `storage_artifacts.py`：NAS落盘、MinIO归档、artifact元数据
-- `db_pg.py`：PG17 DDL对应的插入/查询
-- `memory/`：mem0 抽取与召回，Redis热数据，PG向量召回
+### 7.2 必备模块与职责
+- `main.py`：FastAPI 入口，接收 UniMRCP 转发的 ASR 文本（POST /call/speech）
+- `graph/flow.py`：LangGraph 7 节点 StateGraph（强流程）
+- `clients/mcp.py`：MCP Client 调用 java-mcp-server（身份查询 + 征信查询）
+- `clients/tts.py`：TTS HTTP Client 调用 agent-tts adapter
+- `llm/service.py`：Qwen3.5-9B调用 + JSON schema 校验 + 超时重试 + 降级
+- `rag/retriever.py`：Agentic RAG（自适应检索 + 文档评分 + 查询改写）
+- `memory/`：assembler.py（三层记忆聚合）、chat_history.py（Redis对话历史）、redis_memory.py（热记忆）、store.py（PG记忆）
+- `db/models.py`：PG17 DDL对应的 ORM 模型
+- `storage/repository.py`：异步仓储层
 
-### 7.3 事件驱动对话循环（detect_speech → DETECTED_SPEECH）
-- `CHANNEL_ANSWER`：
-  1) 记录 `call_session`（含 biz_type/user_key）
-  2) 播放固定录音告知（必须成功，否则告警并标红）
-  3) 启动录音（分轨/混音）
-  4) MCP Client 调用 java-mcp-server 拉身份包
-  5) 进入核验（姓名+身份证后四位）
-  6) 启动 detect_speech 进入 listen 状态
-- `DETECTED_SPEECH`：
+### 7.3 每轮对话处理流程（UniMRCP 串联，对客户无感）
+- UniMRCP 收到 ASR 识别结果后，HTTP POST /call/speech → agent-flow：
   1) 落库 user turn（含置信度）
-  2) 召回记忆块（mem0+Redis+pgvector）
-  3) Qwen3.5-9B 决策输出结构化动作
-  4) 二次校验合规/门禁（催收敏感字段仅核验后允许）
-  5) 执行动作：
-     - say/ask：TTS播报（或命中缓存播音频）
-     - handoff：screen_pop_skipped + transfer
-     - end：挂断
-  6) 继续 detect_speech（循环）
-- 静默检测：
-  - Orchestrator 定时器兜底：超过阈值触发提示/结束/转人工（可配置）
+  2) MCP 查询用户身份（手机号 → 用户ID + 身份证后四位）
+  3) 如 marketing 类型，MCP 查询征信（用户ID → 征信资质）
+  4) 召回记忆块（Redis 热记忆 + PG 长期事实）
+  5) Agentic RAG 检索话术知识库
+  6) Qwen3.5-9B 决策输出结构化动作
+  7) 调用 agent-tts 合成语音，返回音频给 UniMRCP
+- orchestrator 返回 JSON {action, text, tts_audio, tts_minio_key}
+- UniMRCP 将音频回传 FreeSWITCH 播放，完成一轮交互
 
 ### 7.4 三业务隔离“强制编码规则”
 - 所有函数签名必须包含 `biz_type`
@@ -362,7 +348,7 @@ aiphone/
 - `tts-engine.service`（GPU1, CosyVoice Server）
 - `tts-adapter.service`（agent-tts FastAPI adapter）
 - `llm-engine.service`（GPU2, Qwen3.5-9B）
-- `orchestrator.service`（agent-orchestrator FastAPI）
+- `orchestrator.service`（agent-flow FastAPI）
 - `mcp-server.service`（java-mcp-server Spring Boot, :9090）
 - `postgresql.service` `redis.service` `minio.service`（如自建）
 
@@ -635,7 +621,7 @@ CREATE INDEX IF NOT EXISTS idx_mem_vec_202605_hnsw
   - `flow_version`
 - TTL：24h（通话结束后可缩短为 1h，便于排查）
 
-#### 11.1.3 最近对话滑窗（ESL回传文本后立刻写，TTL=24h）
+#### 11.1.3 最近对话滑窗（orchestrator 每轮处理后写入，TTL=24h）
 - Key：`cb:call:window:{fs_uuid}`
 - Type：List
 - Value：每条为 JSON（role/text/ts/asr_conf/turn_id）
@@ -741,9 +727,9 @@ CREATE INDEX IF NOT EXISTS idx_mem_vec_202605_hnsw
 - 向量分区表索引必须在分区上建（HNSW）
 - 检索必须加条件：`biz_type, user_key, ts >= now()-interval '180 days'`，并限制 topK
 
-### 12.3 detect_speech 相关
-- DETECTED_SPEECH 文本为空：多见于 VAD 参数不当或音频路径问题；需调 VAD/静音阈值并监控 ASR 失败率
-- 打断/重入：TTS 播放时应暂停 detect_speech，播放结束再恢复；否则容易自我回声触发识别
+### 12.3 UniMRCP 串联链路
+- ASR 识别文本为空：检查 VAD 参数、音频路径、ASR 引擎健康状态
+- orchestrator 超时：检查 LLM 响应时间、MCP Server 连通性、TTS 合成延迟
 
 ### 12.4 高并发 TTS
 - 营销 200 路时 TTS 队列最容易爆：必须启用常用话术缓存，并对营销并发做动态降级
@@ -777,7 +763,7 @@ CREATE INDEX IF NOT EXISTS idx_mem_vec_202605_hnsw
 │   ├── ttsadapter/    # TTS 适配器 (FastAPI, port 8081)
 │   ├── ttsengine/     # TTS 推理引擎 (CosyVoice)
 │   └── Dockerfile
-├── agent-orchestrator/
+├── agent-flow/
 │   ├── src/           # 核心源码 (LangGraph 7 节点, port 8000)
 │   ├── llm/           # LLM 推理引擎 (Qwen3.5-9B)
 │   ├── alembic/       # 数据库迁移
@@ -836,42 +822,43 @@ CREATE INDEX IF NOT EXISTS idx_mem_vec_202605_hnsw
 ```
 用户来电
     │
-    ├─→ FreeSWITCH (mod_sofia)
-    │       │
-    │       ├─→ mod_unimrcp ──→ UniMRCP ──→ agent-asr adapter (:8080) ──→ SenseVoice/VibeVoice ASR (GPU0)
-    │       │                                  agent-tts adapter (:8081) ──→ CosyVoice/VibeVoice TTS (GPU1)
-    │       │
-    │       ├─→ mod_event_socket ──→ ESL ──→ Orchestrator (Python)
-    │       │                                        │
-    │       │                                        ├─→ Qwen3.5-9B (GPU2)
-    │       │                                        ├─→ java-mcp-server (:9090) 用户中心
-    │       │                                        ├─→ Redis
-    │       │                                        ├─→ PG17 (pgvector)
-    │       │                                        └─→ MinIO
-    │       │
-    │       └─→ 录音文件 ──→ NAS ──→ MinIO 归档
-    │
-    └─→ 转人工: loopback/1001
+    └─→ FreeSWITCH (mod_sofia)
+            │
+            └─→ mod_unimrcp ──→ UniMRCP Server (:8060)
+                    │
+                    ├─→ ASR Resource ──→ agent-asr adapter (:8080) ──→ SenseVoice/VibeVoice ASR (GPU0)
+                    │                                                    └─→ 返回识别文本
+                    │
+                    ├─→ 决策 ──→ agent-flow (:8000)
+                    │              │
+                    │              ├─→ java-mcp-server (:9090) 用户中心（身份/征信查询）
+                    │              ├─→ Qwen3.5-9B (GPU2)
+                    │              ├─→ Redis（热记忆/对话历史）
+                    │              ├─→ PG17 pgvector（长期记忆/RAG话术库）
+                    │              └─→ agent-tts adapter (:8081) ──→ CosyVoice/VibeVoice TTS (GPU1)
+                    │
+                    └─→ TTS Resource ──→ 音频回传 FreeSWITCH ──→ 播放给用户
 ```
+
+整个 ASR → 编排决策 → TTS 合成链路由 UniMRCP 串联，对客户完全无感。
 
 ## 验收要点
 
 ### FreeSWITCH
 - [ ] `fs_cli` 能正常连接
 - [ ] `show modules` 显示已加载必要模块
-- [ ] ESL 连接成功（密码认证通过）
 - [ ] SIP 通话能正常建立
 
 ### UniMRCP
 - [ ] UniMRCP 服务启动（端口 8060）
-- [ ] ASR 识别能返回文本
+- [ ] ASR 识别能返回文本（UniMRCP → agent-asr → ASR引擎）
 - [ ] TTS 播报正常（不同 profile 音色不同）
 - [ ] MRCPv2 链路通
+- [ ] UniMRCP 能串联 ASR → orchestrator → TTS 完整链路
 
 ### Orchestrator
-- [ ] ESL 连接并接收事件
-- [ ] detect_speech 启动成功
-- [ ] DETECTED_SPEECH 事件正常回调
+- [ ] POST /call/speech 接收 ASR 文本正常
+- [ ] MCP Client 连接 java-mcp-server 成功
 - [ ] MCP Client 连接 java-mcp-server 成功
 - [ ] 身份查询工具 (`user_identity_query`) 正常返回
 - [ ] 征信查询工具 (`user_credit_query`) 正常返回 (仅 marketing)
@@ -899,7 +886,7 @@ CREATE INDEX IF NOT EXISTS idx_mem_vec_202605_hnsw
 | ASR engine | 推理地址 | SENSEVOICE_API_URL |
 | TTS adapter | 服务地址 | :8081 |
 | TTS engine | 推理地址 | COSYVOICE_API_URL |
-| LLM | 推理地址 | Qwen3.5-9B (GPU2) |
+| LLM | 推理地址 | :8083 (GPU2) |
 | Orchestrator | 服务地址 | :8000 |
 | MCP Server | 用户中心 | :9090 |
 | Redis | 地址 | 10.0.0.30:6379 |

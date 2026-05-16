@@ -5,8 +5,8 @@ After=network.target freeswitch.service redis.service postgresql.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/agent-orchestrator
-ExecStart=/opt/agent-orchestrator/venv/bin/python main.py
+WorkingDirectory=/opt/agent-flow
+ExecStart=/opt/agent-flow/venv/bin/python main.py
 Restart=always
 RestartSec=5
 LimitNOFILE=1000000

@@ -1,4 +1,4 @@
-# agent-orchestrator — FastAPI HTTP + LangGraph 7-node 管线
+# agent-flow — FastAPI HTTP + LangGraph 7-node 管线
 # 接收 ASR 文本，驱动 LLM 对话决策，返回 TTS 音频
 # Port: 8000
 # 依赖: PostgreSQL (pgvector), Redis, MinIO, LLM/ASR/TTS 引擎

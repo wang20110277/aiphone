@@ -26,14 +26,17 @@ def _ensure_bucket(client: Minio):
         client.make_bucket(MINIO_BUCKET)
 
 
-def upload_audio(audio_bytes: bytes, prefix: str = "asr", call_id: str = "") -> str | None:
+def build_object_key(prefix: str = "asr", call_id: str = "") -> str | None:
+    if not MINIO_ENDPOINT:
+        return None
+    date_str = datetime.now().strftime("%Y%m%d")
+    return f"{prefix}/{date_str}/{call_id or uuid.uuid4().hex}.wav"
+
+
+def upload_audio(audio_bytes: bytes, object_name: str) -> None:
     client = _client()
     if client is None:
-        return None
-
-    date_str = datetime.now().strftime("%Y%m%d")
-    object_name = f"{prefix}/{date_str}/{call_id or uuid.uuid4().hex}.wav"
-
+        return
     try:
         _ensure_bucket(client)
         client.put_object(
@@ -44,7 +47,10 @@ def upload_audio(audio_bytes: bytes, prefix: str = "asr", call_id: str = "") -> 
             content_type="audio/wav",
         )
         logger.info(f"Uploaded audio to MinIO: {MINIO_BUCKET}/{object_name}")
-        return object_name
     except Exception as e:
         logger.error(f"Failed to upload audio to MinIO: {e}")
-        return None
+
+
+async def upload_audio_async(audio_bytes: bytes, object_name: str) -> None:
+    import asyncio
+    await asyncio.to_thread(upload_audio, audio_bytes, object_name)

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor agent-orchestrator from ESL-event-driven to a FastAPI HTTP service with a clean 7-node LangGraph pipeline, deleting all deprecated/unused modules.
+**Goal:** Refactor agent-flow from ESL-event-driven to a FastAPI HTTP service with a clean 7-node LangGraph pipeline, deleting all deprecated/unused modules.
 
 **Architecture:** FastAPI receives ASR results via `POST /call/speech`, runs a 7-node LangGraph (receive_asr → mcp_identity → [credit_query] → recall_memory → rag_retrieve → llm_decide → tts_synthesize), and returns TTS audio. Redis replaces in-memory CallStateManager for conversation context. No direct FreeSWITCH connection.
 
@@ -62,7 +62,7 @@
 
 Run:
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && \
+cd /Users/lindaw/Documents/aiphone/agent-flow && \
 rm -f fs_esl.py fs_actions.py event_handlers.py call_state.py compliance.py llm_base.py rag_retriever.py && \
 rm -f memory/pg_facts.py memory/pg_vector.py storage/db_pg.py && \
 rm -rf llm_engines/ && \
@@ -73,7 +73,7 @@ rm -f tests/test_llm_base.py tests/test_rag_retriever.py tests/test_prompt_build
 
 Run:
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -c "import config; import graph_flow; print('remaining imports OK')"
+cd /Users/lindaw/Documents/aiphone/agent-flow && python -c "import config; import graph_flow; print('remaining imports OK')"
 ```
 Expected: ImportError for graph_flow (it imports from `compliance` which was deleted) — this is expected, will be fixed in Task 3.
 
@@ -88,8 +88,8 @@ git add -A && git commit -m "chore(orchestrator): 删除废弃模块 — ESL/com
 ### Task 2: Create tts_client.py — TTS adapter HTTP client
 
 **Files:**
-- Create: `agent-orchestrator/tts_client.py`
-- Create: `agent-orchestrator/tests/test_tts_client.py`
+- Create: `agent-flow/tts_client.py`
+- Create: `agent-flow/tests/test_tts_client.py`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -143,7 +143,7 @@ async def test_synthesize_failure_returns_none():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_tts_client.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_tts_client.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'tts_client'`
 
 - [ ] **Step 3: Write minimal implementation**
@@ -180,13 +180,13 @@ class TTSClient:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_tts_client.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_tts_client.py -v`
 Expected: PASS (2 tests)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add tts_client.py tests/test_tts_client.py && git commit -m "feat(orchestrator): 新增 TTS adapter HTTP client"
+cd /Users/lindaw/Documents/aiphone/agent-flow && git add tts_client.py tests/test_tts_client.py && git commit -m "feat(orchestrator): 新增 TTS adapter HTTP client"
 ```
 
 ---
@@ -194,8 +194,8 @@ cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add tts_client.py t
 ### Task 3: Rewrite graph_flow.py — 7-node LangGraph pipeline
 
 **Files:**
-- Rewrite: `agent-orchestrator/graph_flow.py`
-- Create: `agent-orchestrator/tests/test_graph_flow.py`
+- Rewrite: `agent-flow/graph_flow.py`
+- Create: `agent-flow/tests/test_graph_flow.py`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -324,7 +324,7 @@ async def test_create_call_graph_compiles():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_graph_flow.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_graph_flow.py -v`
 Expected: FAIL — imports broken (graph_flow still imports `compliance`)
 
 - [ ] **Step 3: Rewrite graph_flow.py with 7-node pipeline**
@@ -595,13 +595,13 @@ def create_call_graph():
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_graph_flow.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_graph_flow.py -v`
 Expected: PASS (9 tests)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add graph_flow.py tests/test_graph_flow.py && git commit -m "refactor(orchestrator): 重写 LangGraph 7 节点管线"
+cd /Users/lindaw/Documents/aiphone/agent-flow && git add graph_flow.py tests/test_graph_flow.py && git commit -m "refactor(orchestrator): 重写 LangGraph 7 节点管线"
 ```
 
 ---
@@ -609,7 +609,7 @@ cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add graph_flow.py t
 ### Task 4: Update config.py — remove ESL, add TTS adapter URL
 
 **Files:**
-- Modify: `agent-orchestrator/config.py`
+- Modify: `agent-flow/config.py`
 
 - [ ] **Step 1: Update config.py**
 
@@ -670,13 +670,13 @@ Changes:
 
 - [ ] **Step 2: Run existing config test to verify it passes**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_config.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_config.py -v`
 Expected: PASS
 
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add config.py && git commit -m "refactor(orchestrator): 移除 ESL 配置，新增 TTS adapter URL"
+cd /Users/lindaw/Documents/aiphone/agent-flow && git add config.py && git commit -m "refactor(orchestrator): 移除 ESL 配置，新增 TTS adapter URL"
 ```
 
 ---
@@ -684,8 +684,8 @@ cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add config.py && gi
 ### Task 5: Rewrite main.py — FastAPI HTTP service
 
 **Files:**
-- Rewrite: `agent-orchestrator/main.py`
-- Create: `agent-orchestrator/tests/test_main.py`
+- Rewrite: `agent-flow/main.py`
+- Create: `agent-flow/tests/test_main.py`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -742,7 +742,7 @@ async def test_call_speech():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_main.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_main.py -v`
 Expected: FAIL — main.py still has old code
 
 - [ ] **Step 3: Rewrite main.py**
@@ -839,13 +839,13 @@ async def handle_speech(request: SpeechRequest):
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/test_main.py -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/test_main.py -v`
 Expected: PASS (2 tests)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add main.py tests/test_main.py && git commit -m "refactor(orchestrator): 重写 main.py 为 FastAPI HTTP 服务"
+cd /Users/lindaw/Documents/aiphone/agent-flow && git add main.py tests/test_main.py && git commit -m "refactor(orchestrator): 重写 main.py 为 FastAPI HTTP 服务"
 ```
 
 ---
@@ -853,7 +853,7 @@ cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add main.py tests/t
 ### Task 6: Update requirements.txt — remove python-ESL
 
 **Files:**
-- Modify: `agent-orchestrator/requirements.txt`
+- Modify: `agent-flow/requirements.txt`
 
 - [ ] **Step 1: Remove python-ESL from requirements**
 
@@ -898,7 +898,7 @@ pytest-asyncio>=0.23
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add requirements.txt && git commit -m "chore(orchestrator): 移除 python-ESL 依赖"
+cd /Users/lindaw/Documents/aiphone/agent-flow && git add requirements.txt && git commit -m "chore(orchestrator): 移除 python-ESL 依赖"
 ```
 
 ---
@@ -910,7 +910,7 @@ cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add requirements.tx
 
 - [ ] **Step 1: Run all tests**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/ -v --tb=short`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/ -v --tb=short`
 Expected: All tests pass. Remaining test files: `test_config.py`, `test_mcp_client.py`, `test_graph_flow.py`, `test_tts_client.py`, `test_main.py`, `tests/memory/` directory.
 
 - [ ] **Step 2: Fix any import errors in remaining test files**
@@ -928,13 +928,13 @@ rm -f tests/test_call_state.py tests/test_compliance.py
 
 - [ ] **Step 3: Re-run full suite**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/ -v --tb=short`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/ -v --tb=short`
 Expected: All tests pass
 
 - [ ] **Step 4: Commit any fixes**
 
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add -A && git commit -m "chore(orchestrator): 清理残留测试文件"
+cd /Users/lindaw/Documents/aiphone/agent-flow && git add -A && git commit -m "chore(orchestrator): 清理残留测试文件"
 ```
 
 ---
@@ -945,7 +945,7 @@ cd /Users/lindaw/Documents/aiphone/agent-orchestrator && git add -A && git commi
 
 Run:
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -c "
+cd /Users/lindaw/Documents/aiphone/agent-flow && python -c "
 import main
 import graph_flow
 import config
@@ -968,7 +968,7 @@ Expected: `All imports OK`
 
 Run:
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && \
+cd /Users/lindaw/Documents/aiphone/agent-flow && \
 for f in fs_esl.py fs_actions.py event_handlers.py call_state.py compliance.py llm_base.py rag_retriever.py; do \
   test -f "$f" && echo "ERROR: $f still exists" || true; \
 done && \
@@ -979,14 +979,14 @@ Expected: `Deletion verified` (no ERROR lines)
 
 - [ ] **Step 3: Run full test suite one final time**
 
-Run: `cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -m pytest tests/ -v`
+Run: `cd /Users/lindaw/Documents/aiphone/agent-flow && python -m pytest tests/ -v`
 Expected: All tests pass
 
 - [ ] **Step 4: Verify graph node count is 7**
 
 Run:
 ```bash
-cd /Users/lindaw/Documents/aiphone/agent-orchestrator && python -c "
+cd /Users/lindaw/Documents/aiphone/agent-flow && python -c "
 from graph_flow import create_call_graph
 g = create_call_graph()
 print(f'Graph nodes: {list(g.nodes.keys())}')

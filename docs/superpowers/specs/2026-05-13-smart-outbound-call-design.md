@@ -81,7 +81,7 @@ aiphone/
 │   │   ├── vibevoice-tts.service
 │   │   └── install.sh
 │   └── README.md
-├── agent-orchestrator/       # Phase 3-7 - Python 编排器（待实现）
+├── agent-flow/       # Phase 3-7 - Python 编排器（待实现）
 │   ├── main.py               # 入口
 │   ├── fs_esl.py             # ESL 连接管理
 │   ├── fs_actions.py         # FS 动作封装
@@ -506,7 +506,7 @@ action = result["llm_action"]
 ### 模块结构
 
 ```
-agent-orchestrator/memory/
+agent-flow/memory/
 ├── redis_memory.py      # Redis hot memory（短期）
 ├── pg_facts.py          # PG facts（长期）
 ├── pg_vector.py         # pgvector 相似召回
@@ -690,7 +690,7 @@ def compliance_check(action: LLMAction, state: CallState) -> LLMAction:
 |-------|--------|----------|
 | 1 | deploy/ 安装脚本 + DDL | FS/UniMRCP/PG/Redis/MinIO 全部就绪 |
 | 2 | mrcp-asr/ + mrcp-tts/ 可插拔适配层 | MRCPv2 → 引擎 ASR/TTS 端到端通，引擎可配置切换 |
-| 3 | agent-orchestrator/ 核心代码 | ESL 事件循环 + detect_speech 对话循环正常 |
+| 3 | agent-flow/ 核心代码 | ESL 事件循环 + detect_speech 对话循环正常 |
 | 4 | llm_base.py + llm_engines/ + prompts/ | LLM 结构化输出（默认 Qwen），引擎可配置切换 |
 | 5 | graph_flow.py | LangGraph 多节点流转，合规门禁正常 |
 | 6 | memory/ 模块 | 三层记忆读写 + Memory Block 组装 < 100ms |

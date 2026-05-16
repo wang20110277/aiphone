@@ -17,7 +17,7 @@ cd agent-asr && PYTHONPATH=$(pwd) pytest tests/ -v
 cd agent-tts && PYTHONPATH=$(pwd) pytest tests/ -v
 
 # Orchestrator (main.py at root, source in src/)
-cd agent-orchestrator && PYTHONPATH=$(pwd):$(pwd)/src pytest tests/ -v
+cd agent-flow && PYTHONPATH=$(pwd):$(pwd)/src pytest tests/ -v
 
 # Run single test file
 cd agent-asr && PYTHONPATH=$(pwd) pytest tests/engines/sensevoice/test_engine.py -v
@@ -32,12 +32,12 @@ cd agent-asr/asradapter && PYTHONPATH=$(cd .. && pwd) uvicorn main:app --host 0.
 cd agent-tts/ttsadapter && PYTHONPATH=$(cd .. && pwd) uvicorn main:app --host 0.0.0.0 --port 8081
 
 # Orchestrator (main.py at root, source in src/)
-cd agent-orchestrator && PYTHONPATH=$(pwd):$(pwd)/src uvicorn main:app --host 0.0.0.0 --port 8000
+cd agent-flow && PYTHONPATH=$(pwd):$(pwd)/src uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ### DB Migrations
 ```bash
-cd agent-orchestrator && PYTHONPATH=$(pwd)/src alembic upgrade head
+cd agent-flow && PYTHONPATH=$(pwd)/src alembic upgrade head
 ```
 
 ### MCP Server (Java)
@@ -53,28 +53,29 @@ cd mcp-server/java-mcp-server && JAVA_HOME=/opt/homebrew/opt/openjdk ./mvnw spri
 
 ```
 SIP Caller → FreeSWITCH (mod_sofia, SIP/RTP)
-    ├─ mod_unimrcp (MRCPv2 client) → UniMRCP Server (:8060)
-    │    ├─ ASR resource → HTTP POST → agent-asr adapter (:8080)
-    │    └─ TTS resource → HTTP POST → agent-tts adapter (:8081)
-    └─ 外部调度系统 → HTTP POST /call/speech → agent-orchestrator (:8000)
-         ├─ 7-node LangGraph pipeline → LLM decision → TTS via HTTP
-         ├─ Node ②/③: MCP client → java-mcp-server (:9090) 用户中心
-         └─ Returns: {action, text, tts_audio, tts_minio_key}
+    └─ mod_unimrcp (MRCPv2) → UniMRCP Server (:8060)
+         ├─ ASR: 音频 → agent-asr (:8080) → 识别文本
+         ├─ 决策: 文本 → agent-flow (:8000) → 7-node pipeline → LLM → 回复文本
+         │    ├─ Node ②/③: MCP client → java-mcp-server (:9090) 用户中心
+         │    └─ Node ⑦: → agent-tts (:8081) → 合成音频
+         └─ TTS: 音频 → FreeSWITCH → SIP Caller（全程对客户无感）
 ```
 
 Data flow per turn:
 ```
-呼入: FreeSWITCH → UniMRCP → agent-asr → 外部调度 → POST /call/speech → orchestrator
-呼出: orchestrator → POST /tts/synthesize_json → agent-tts → UniMRCP → FreeSWITCH
+呼入: FreeSWITCH → UniMRCP → agent-asr → 识别文本
+决策: UniMRCP → agent-flow → LangGraph 7节点 → MCP/LLM/记忆/RAG → 回复文本
+合成: agent-flow → agent-tts → 音频
+呼出: 音频 → UniMRCP → FreeSWITCH → SIP Caller
 ```
 
-### Three Components
+### Four Components
 
 **agent-asr** — FastAPI adapter with pluggable ASR engines. Receives audio from UniMRCP, uploads to MinIO, forwards to engine for recognition. Endpoints: `POST /asr/recognize`, `GET /asr/audio/{call_id}`, `GET /healthz`.
 
-**agent-tts** — FastAPI adapter with pluggable TTS engines. Receives text from UniMRCP/orchestrator, synthesizes audio, uploads to MinIO. Endpoints: `POST /tts/synthesize` (binary), `POST /tts/synthesize_json` (JSON with base64 audio + minio_key), `GET /healthz`.
+**agent-tts** — FastAPI adapter with pluggable TTS engines. Receives text from orchestrator, synthesizes audio, uploads to MinIO. Endpoints: `POST /tts/synthesize` (binary), `POST /tts/synthesize_json` (JSON with base64 audio + minio_key), `GET /healthz`.
 
-**agent-orchestrator** — FastAPI HTTP service. Receives ASR text via `POST /call/speech`, runs 7-node LangGraph pipeline, returns TTS audio. LLM via LangChain ChatOpenAI with structured output (`LLMAction`). Conversation history via langchain-redis `RedisChatMessageHistory`. Agentic RAG with adaptive retrieval + document grading + query rewriting.
+**agent-flow** — FastAPI HTTP service. Receives ASR text from UniMRCP via `POST /call/speech`, runs 7-node LangGraph pipeline, calls agent-tts to synthesize audio, returns result to UniMRCP. LLM via LangChain ChatOpenAI with structured output (`LLMAction`). Conversation history via langchain-redis `RedisChatMessageHistory`. Agentic RAG with adaptive retrieval + document grading + query rewriting.
 
 **java-mcp-server** — Spring Boot 3.5 + Spring AI 1.1.6 stateless MCP server (WebMVC transport). Serves as the user center backend for orchestrator nodes ② and ③. Exposes two MCP tools: `user_identity_query` (phone + biz_type → user_id, phone_masked, id_card_last_four) and `user_credit_query` (user_id → credit_qualified, risk_level). Endpoint: `POST /mcp` on port 9090.
 
@@ -131,7 +132,7 @@ Full adaptive + corrective RAG inside `rag_retrieve_node`:
 
 | Module | Role |
 |--------|------|
-| `main.py` | FastAPI app with lifespan init, `POST /call/speech`, `GET /healthz` (at project root) |
+| `main.py` | FastAPI app with lifespan init, `POST /call/speech` (from UniMRCP), `GET /healthz` |
 | `src/config.py` | pydantic-settings, all config via `CALLBOT_` env prefix |
 | `src/database.py` | SQLAlchemy 2.0 async engine + session factory |
 | `src/graph/flow.py` | LangGraph 7-node StateGraph pipeline |
@@ -163,7 +164,7 @@ aiphone/
 │   │   └── engines/     # cosyvoice/, vibevoice/
 │   ├── ttsengine/       # CosyVoice 推理引擎 (Dockerfile + server.py)
 │   └── tests/           # test_base, test_main, test_storage, engines/
-├── agent-orchestrator/  # LangGraph 7-node pipeline (FastAPI HTTP service)
+├── agent-flow/  # LangGraph 7-node pipeline (FastAPI HTTP service)
 │   ├── main.py          # FastAPI entry point
 │   ├── src/             # 核心源码 (PYTHONPATH includes src/)
 │   │   ├── config.py    # pydantic-settings
@@ -199,4 +200,4 @@ aiphone/
 - **FreeSWITCH 1.10.12** compiled from source with mod_unimrcp
 - **Java MCP Server** Spring Boot 3.5 + Spring AI 1.1.6, Java 25, Maven build
 - **UniMRCP** compiled from source
-- **GPU allocation**: ASR=GPU0, TTS=GPU1, LLM(Qwen)=GPU2
+- **GPU allocation**: ASR=GPU0, TTS=GPU1, LLM(Qwen)=GPU2(:8083)
