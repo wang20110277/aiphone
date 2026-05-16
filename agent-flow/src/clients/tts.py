@@ -1,4 +1,5 @@
 """TTS adapter HTTP client — 调用 TTS adapter 的 /tts/synthesize_json 端点"""
+import json
 import logging
 import httpx
 
@@ -16,7 +17,7 @@ class TTSClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(
                     f"{self._base_url}/tts/synthesize_json",
-                    data={"text": text, "params": f'{{"call_id":"{call_id}","biz_type":"{biz_type}"}}'},
+                    data={"text": text, "params": json.dumps({"call_id": call_id, "biz_type": biz_type})},
                 )
                 resp.raise_for_status()
                 return resp.json()

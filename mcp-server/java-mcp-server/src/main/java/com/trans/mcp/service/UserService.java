@@ -12,10 +12,13 @@ public class UserService {
 	public IdentityResult user_identity_query(
 			@ToolParam(description = "用户手机号") String phone,
 			@ToolParam(description = "业务类型：customer_service / collection / marketing") String biz_type) {
+		if (phone == null || !phone.matches("1\\d{10}")) {
+			throw new IllegalArgumentException("手机号格式不正确，应为11位数字且以1开头");
+		}
 		// TODO: 接入真实用户中心数据源
 		return new IdentityResult(
 				"USER_" + Math.abs(phone.hashCode() % 100000),
-				phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4),
+				phone.substring(0, 3) + "****" + phone.substring(7),
 				"1234"
 		);
 	}

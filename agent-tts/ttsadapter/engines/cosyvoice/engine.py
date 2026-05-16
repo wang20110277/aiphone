@@ -5,7 +5,6 @@ import logging
 import os
 
 from ttsadapter.base import TTSEngine, TTSResult
-from cosyvoice.cli.cosyvoice import CosyVoice2
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +31,8 @@ class CosyVoiceTTSEngine(TTSEngine):
         runtime_path = os.environ.get("COSYVOICE_RUNTIME", "/opt/cosyvoice/runtime")
         if runtime_path not in sys.path:
             sys.path.insert(0, runtime_path)
+        from cosyvoice.cli.cosyvoice import CosyVoice2
+
         logger.info("Loading CosyVoice2 model from %s", MODEL_DIR)
         self._model = CosyVoice2(MODEL_DIR)
         logger.info("CosyVoice2 model loaded")
